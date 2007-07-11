@@ -129,6 +129,7 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
             magic, cmd, keylen, opaque, remaining=\
                 struct.unpack(PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
             assert magic == REQ_MAGIC_BYTE
+            assert keylen <= remaining
             # Grab the data section of this request
             data=self.rbuf[MIN_RECV_PACKET:MIN_RECV_PACKET+remaining]
             assert len(data) == remaining
