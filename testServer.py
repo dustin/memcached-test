@@ -49,6 +49,7 @@ class BaseBackend(object):
         }
 
     ERR_UNKNOWN_CMD = 0x81
+    ERR_NOT_FOUND = 0x1
 
     def __init__(self):
         self.handlers={}
@@ -92,7 +93,7 @@ class DictBackend(BaseBackend):
     """Sample backend implementation with a non-expiring dict."""
     def handle_get(self, cmd, hdrs, key, data):
         val=self.storage.get(key, None)
-        rv=1, 'Not found'
+        rv=self.ERR_NOT_FOUND, 'Not found'
         if val:
             rv = 0, struct.pack('>I', val[0]) + val[2]
         return rv
