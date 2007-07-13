@@ -65,7 +65,7 @@ class BaseBackend(object):
         hdrSize=struct.calcsize(fmt)
         assert hdrSize <= len(data), "Data too short for " + fmt + ': ' + `data`
         hdr=struct.unpack(fmt, data[:hdrSize])
-        assert len(data) > hdrSize + keylen
+        assert len(data) >= hdrSize + keylen
         key=data[hdrSize:keylen+hdrSize]
         assert len(key) == keylen, "len(%s) == %d, expected %d" \
             % (key, len(key), keylen)
