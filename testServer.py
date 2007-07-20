@@ -85,12 +85,12 @@ class BaseBackend(object):
         return self.ERR_UNKNOWN_CMD, "The command %d is unknown" % cmd
 
 class DictBackend(BaseBackend):
+    """Sample backend implementation with a non-expiring dict."""
 
     def __init__(self):
         super(DictBackend, self).__init__()
         self.storage={}
 
-    """Sample backend implementation with a non-expiring dict."""
     def handle_get(self, cmd, hdrs, key, data):
         val=self.storage.get(key, None)
         rv=self.ERR_NOT_FOUND, 'Not found'
