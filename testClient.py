@@ -74,10 +74,41 @@ class MemcachedClient(object):
         """Replace a value in the memcached server iff it already exists."""
         self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags, val)
 
+    def __parseGet(self, data):
+        return struct.unpack(">I", data[:4])[0], data[4:]
+
     def get(self, key):
         """Get the value for a given key within the memcached server."""
         parts=self._doCmd(memcacheConstants.CMD_GET, key, '')
-        return struct.unpack(">I", parts[:4])[0], parts[4:]
+        return self.__parseGet(parts)
+
+    def getMulti(self, keys):
+        """Get values for any available keys in the given iterable.
+
+        Returns a dict of matched keys to their values."""
+        opaqued={}
+        i=1
+        for key in keys:
+            opaqued[i] = key
+            i += 1
+        terminal=i+10
+        # Send all of the keys in quiet
+        for k,v in opaqued.iteritems():
+            self._sendCmd(memcacheConstants.CMD_GETQ, v, '', k)
+
+        self._sendCmd(memcacheConstants.CMD_NOOP, '', '', terminal)
+
+        # Handle the response
+        rv={}
+        done=False
+        while not done:
+            opaque, data=self._handleSingleResponse(None)
+            if opaque != terminal:
+                rv[opaqued[opaque]]=self.__parseGet(data)
+            else:
+                done=True
+
+        return rv
 
     def noop(self):
         """Send a noop command."""
