@@ -25,7 +25,9 @@ class BaseBackend(object):
 
     # Command IDs to method names.  This is used to build a dispatch dict on
     # the fly.
-    CMDS={memcacheConstants.CMD_GET: 'handle_get',
+    CMDS={
+        memcacheConstants.CMD_GET: 'handle_get',
+        memcacheConstants.CMD_GETQ: 'handle_getq',
         memcacheConstants.CMD_SET: 'handle_set',
         memcacheConstants.CMD_ADD: 'handle_add',
         memcacheConstants.CMD_REPLACE: 'handle_replace',
@@ -34,6 +36,7 @@ class BaseBackend(object):
         memcacheConstants.CMD_DECR: 'handle_descr',
         memcacheConstants.CMD_QUIT: 'handle_quit',
         memcacheConstants.CMD_FLUSH: 'handle_flush',
+        memcacheConstants.CMD_NOOP: 'handle_noop',
         }
 
     def __init__(self):
@@ -65,6 +68,11 @@ class BaseBackend(object):
 
         return self.handlers.get(cmd, self.handle_unknown)(cmd, hdrs, key, val)
 
+    def handle_noop(self, cmd, hdrs, key, data):
+        """Handle a noop"""
+        print "Noop"
+        return 0, ''
+
     def handle_unknown(self, cmd, hdrs, key, data):
         """invoked for any unknown command."""
         return memcacheConstants.ERR_UNKNOWN_CMD, \
@@ -87,6 +95,13 @@ class DictBackend(BaseBackend):
                 del self.storage[key]
             else:
                 rv = 0, struct.pack('>I', val[0]) + val[2]
+        return rv
+
+    def handle_getq(self, cmd, hdrs, key, data):
+        rv=self.handle_get(cmd, hdrs, key, data)
+        if rv[0] == memcacheConstants.ERR_NOT_FOUND:
+            print "Swallowing miss"
+            rv = None
         return rv
 
     def handle_set(self, cmd, hdrs, key, data):

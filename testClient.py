@@ -37,24 +37,30 @@ class MemcachedClient(object):
         self.s.connect_ex((host, port))
         self.r=random.Random()
 
-    def _sendCmd(self, cmd, key, val, extraHeader=''):
-        """Send a command and await its response."""
-        myopaque=self.r.randint(0, 2**32)
+    def _sendCmd(self, cmd, key, val, opaque, extraHeader=''):
         msg=struct.pack(PKT_FMT, REQ_MAGIC_BYTE,
-            cmd, len(key), myopaque, len(key) + len(extraHeader) + len(val))
+            cmd, len(key), opaque, len(key) + len(extraHeader) + len(val))
         self.s.send(msg + extraHeader + key + val)
+
+    def _handleSingleResponse(self, myopaque):
         response=self.s.recv(MIN_RECV_PACKET)
         assert len(response) == MIN_RECV_PACKET
         magic, cmd, errcode, opaque, remaining=struct.unpack(PKT_FMT, response)
         rv=self.s.recv(remaining)
         assert magic == REQ_MAGIC_BYTE
-        assert opaque == myopaque
+        assert myopaque is None or opaque == myopaque
         if errcode != 0:
             raise MemcachedError(errcode,  rv)
-        return rv
+        return opaque, rv
+
+    def _doCmd(self, cmd, key, val, extraHeader=''):
+        """Send a command and await its response."""
+        opaque=self.r.randint(0, 2**32)
+        self._sendCmd(cmd, key, val, opaque, extraHeader)
+        return self._handleSingleResponse(opaque)[1]
 
     def _mutate(self, cmd, key, exp, flags, val):
-        self._sendCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp))
+        self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp))
 
     def set(self, key, exp, flags, val):
         """Set a value in the memcached server."""
@@ -70,13 +76,17 @@ class MemcachedClient(object):
 
     def get(self, key):
         """Get the value for a given key within the memcached server."""
-        parts=self._sendCmd(memcacheConstants.CMD_GET, key, '')
+        parts=self._doCmd(memcacheConstants.CMD_GET, key, '')
         return struct.unpack(">I", parts[:4])[0], parts[4:]
+
+    def noop(self):
+        """Send a noop command."""
+        self._doCmd(memcacheConstants.CMD_NOOP, '', '')
 
     def delete(self, key):
         """Delete the value for a given key within the memcached server."""
-        self._sendCmd(memcacheConstants.CMD_DELETE, key, '')
+        self._doCmd(memcacheConstants.CMD_DELETE, key, '')
 
     def flush(self):
         """Flush all storage in a memcached instance."""
-        self._sendCmd(memcacheConstants.CMD_FLUSH, '', '')
+        self._doCmd(memcacheConstants.CMD_FLUSH, '', '')
