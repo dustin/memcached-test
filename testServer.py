@@ -8,6 +8,7 @@ Copyright (c) 2007  Dustin Sallings <dustin@spy.net>
 import asyncore
 import socket
 import struct
+import time
 
 REQ_MAGIC_BYTE = 0xf
 
@@ -24,6 +25,7 @@ CMD_DELETE = 4
 CMD_INCR = 5
 CMD_DECR = 6
 CMD_QUIT = 7
+CMD_FLUSH = 8
 
 SET_PKT_FMT=">II"
 
@@ -45,7 +47,8 @@ class BaseBackend(object):
         CMD_DELETE: 'handle_delete',
         CMD_INCR: 'handle_incr',
         CMD_DECR: 'handle_descr',
-        CMD_QUIT: 'handle_quit'
+        CMD_QUIT: 'handle_quit',
+        CMD_FLUSH: 'handle_flush',
         }
 
     ERR_UNKNOWN_CMD = 0x81
@@ -95,13 +98,31 @@ class DictBackend(BaseBackend):
         val=self.storage.get(key, None)
         rv=self.ERR_NOT_FOUND, 'Not found'
         if val:
-            rv = 0, struct.pack('>I', val[0]) + val[2]
+            now=time.time()
+            if now >= val[1]:
+                print key, "expired"
+                del self.storage[key]
+            else:
+                rv = 0, struct.pack('>I', val[0]) + val[2]
         return rv
 
     def handle_set(self, cmd, hdrs, key, data):
-        self.storage[key]=(hdrs[0], hdrs[1], data)
+        self.storage[key]=(hdrs[0], time.time() + hdrs[1], data)
         print "Stored", self.storage[key], "in", key
         return 0, ''
+
+    def handle_flush(self, cmd, hdrs, key, data):
+        self.storage.clear()
+        print "Flushed"
+        return 0, ''
+
+    def handle_delete(self, cmd, hdrs, key, data):
+        rv=self.ERR_NOT_FOUND, 'Not found'
+        if key in self.storage:
+            del self.storage[key]
+            print "Deleted", key
+            rv=0, ''
+        return rv
 
 class MemcachedBinaryChannel(asyncore.dispatcher):
     """A channel implementing the binary protocol for memcached."""
