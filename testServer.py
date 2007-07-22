@@ -94,6 +94,18 @@ class DictBackend(BaseBackend):
         print "Stored", self.storage[key], "in", key
         return 0, ''
 
+    def handle_add(self, cmd, hdrs, key, data):
+        rv=memcacheConstants.ERR_EXISTS, 'Data exists for key'
+        if key not in self.storage:
+            rv=self.handle_set(cmd, hdrs, key, data)
+        return rv
+
+    def handle_replace(self, cmd, hdrs, key, data):
+        rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
+        if key in self.storage:
+            rv=self.handle_set(cmd, hdrs, key, data)
+        return rv
+
     def handle_flush(self, cmd, hdrs, key, data):
         self.storage.clear()
         print "Flushed"
