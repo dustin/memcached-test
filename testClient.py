@@ -11,8 +11,9 @@ import random
 import struct
 import exceptions
 
-from testServer import REQ_MAGIC_BYTE, PKT_FMT, MIN_RECV_PACKET, SET_PKT_FMT
-import testServer
+from memcacheConstants import REQ_MAGIC_BYTE, PKT_FMT, MIN_RECV_PACKET
+from memcacheConstants import SET_PKT_FMT
+import memcacheConstants
 
 class MemcachedError(exceptions.Exception):
     """Error raised when a command fails."""
@@ -47,25 +48,25 @@ class MemcachedClient(object):
 
     def set(self, key, exp, flags, val):
         """Set a value in the memcached server."""
-        self._mutate(testServer.CMD_SET, key, exp, flags, val)
+        self._mutate(memcacheConstants.CMD_SET, key, exp, flags, val)
 
     def add(self, key, exp, flags, val):
         """Add a value in the memcached server iff it doesn't already exist."""
-        self._mutate(testServer.CMD_ADD, key, exp, flags, val)
+        self._mutate(memcacheConstants.CMD_ADD, key, exp, flags, val)
 
     def replace(self, key, exp, flags, val):
         """Replace a value in the memcached server iff it already exists."""
-        self._mutate(testServer.CMD_REPLACE, key, exp, flags, val)
+        self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags, val)
 
     def get(self, key):
         """Get the value for a given key within the memcached server."""
-        parts=self._sendCmd(testServer.CMD_GET, key, '')
+        parts=self._sendCmd(memcacheConstants.CMD_GET, key, '')
         return struct.unpack(">I", parts[:4])[0], parts[4:]
 
     def delete(self, key):
         """Delete the value for a given key within the memcached server."""
-        self._sendCmd(testServer.CMD_DELETE, key, '')
+        self._sendCmd(memcacheConstants.CMD_DELETE, key, '')
 
     def flush(self):
         """Flush all storage in a memcached instance."""
-        self._sendCmd(testServer.CMD_FLUSH, '', '')
+        self._sendCmd(memcacheConstants.CMD_FLUSH, '', '')

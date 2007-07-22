@@ -10,29 +10,14 @@ import socket
 import struct
 import time
 
-REQ_MAGIC_BYTE = 0xf
+import memcacheConstants
 
-PKT_FMT=">BBBxII"
-# min recv packet size
-MIN_RECV_PACKET = struct.calcsize(PKT_FMT)
-
-# Command constants
-CMD_GET = 0
-CMD_SET = 1
-CMD_ADD = 2
-CMD_REPLACE = 3
-CMD_DELETE = 4
-CMD_INCR = 5
-CMD_DECR = 6
-CMD_QUIT = 7
-CMD_FLUSH = 8
-
-SET_PKT_FMT=">II"
+from memcacheConstants import MIN_RECV_PACKET, PKT_FMT, REQ_MAGIC_BYTE
 
 EXTRA_HDR_FMTS={
-    CMD_SET: SET_PKT_FMT,
-    CMD_ADD: SET_PKT_FMT,
-    CMD_REPLACE: SET_PKT_FMT
+    memcacheConstants.CMD_SET: memcacheConstants.SET_PKT_FMT,
+    memcacheConstants.CMD_ADD: memcacheConstants.SET_PKT_FMT,
+    memcacheConstants.CMD_REPLACE: memcacheConstants.SET_PKT_FMT
 }
 
 class BaseBackend(object):
@@ -40,19 +25,16 @@ class BaseBackend(object):
 
     # Command IDs to method names.  This is used to build a dispatch dict on
     # the fly.
-    CMDS={CMD_GET: 'handle_get',
-        CMD_SET: 'handle_set',
-        CMD_ADD: 'handle_add',
-        CMD_REPLACE: 'handle_replace',
-        CMD_DELETE: 'handle_delete',
-        CMD_INCR: 'handle_incr',
-        CMD_DECR: 'handle_descr',
-        CMD_QUIT: 'handle_quit',
-        CMD_FLUSH: 'handle_flush',
+    CMDS={memcacheConstants.CMD_GET: 'handle_get',
+        memcacheConstants.CMD_SET: 'handle_set',
+        memcacheConstants.CMD_ADD: 'handle_add',
+        memcacheConstants.CMD_REPLACE: 'handle_replace',
+        memcacheConstants.CMD_DELETE: 'handle_delete',
+        memcacheConstants.CMD_INCR: 'handle_incr',
+        memcacheConstants.CMD_DECR: 'handle_descr',
+        memcacheConstants.CMD_QUIT: 'handle_quit',
+        memcacheConstants.CMD_FLUSH: 'handle_flush',
         }
-
-    ERR_UNKNOWN_CMD = 0x81
-    ERR_NOT_FOUND = 0x1
 
     def __init__(self):
         self.handlers={}
@@ -85,7 +67,8 @@ class BaseBackend(object):
 
     def handle_unknown(self, cmd, hdrs, key, data):
         """invoked for any unknown command."""
-        return self.ERR_UNKNOWN_CMD, "The command %d is unknown" % cmd
+        return memcacheConstants.ERR_UNKNOWN_CMD, \
+            "The command %d is unknown" % cmd
 
 class DictBackend(BaseBackend):
     """Sample backend implementation with a non-expiring dict."""
@@ -96,7 +79,7 @@ class DictBackend(BaseBackend):
 
     def handle_get(self, cmd, hdrs, key, data):
         val=self.storage.get(key, None)
-        rv=self.ERR_NOT_FOUND, 'Not found'
+        rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
         if val:
             now=time.time()
             if now >= val[1]:
@@ -117,7 +100,7 @@ class DictBackend(BaseBackend):
         return 0, ''
 
     def handle_delete(self, cmd, hdrs, key, data):
-        rv=self.ERR_NOT_FOUND, 'Not found'
+        rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
         if key in self.storage:
             del self.storage[key]
             print "Deleted", key
