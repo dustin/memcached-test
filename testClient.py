@@ -17,7 +17,17 @@ import memcacheConstants
 
 class MemcachedError(exceptions.Exception):
     """Error raised when a command fails."""
-    pass
+
+    def __init__(self, status, msg):
+        supermsg='Memcached error #' + `status`
+        if msg: supermsg += ":  " + msg
+        exceptions.Exception.__init__(self, supermsg)
+
+        self.status=status
+        self.msg=msg
+
+    def __repr__(self):
+        return "<MemcachedError #%d ``%s''>" % (self.status, self.msg)
 
 class MemcachedClient(object):
     """Simple memcached client."""
@@ -40,7 +50,7 @@ class MemcachedClient(object):
         assert magic == REQ_MAGIC_BYTE
         assert opaque == myopaque
         if errcode != 0:
-            raise MemcachedError("Error:  " + `errcode` + ": " +  rv)
+            raise MemcachedError(errcode,  rv)
         return rv
 
     def _mutate(self, cmd, key, exp, flags, val):
