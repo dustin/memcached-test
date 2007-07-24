@@ -14,6 +14,8 @@ import memcacheConstants
 
 from memcacheConstants import MIN_RECV_PACKET, PKT_FMT, REQ_MAGIC_BYTE
 
+VERSION="1.0"
+
 EXTRA_HDR_FMTS={
     memcacheConstants.CMD_SET: memcacheConstants.SET_PKT_FMT,
     memcacheConstants.CMD_ADD: memcacheConstants.SET_PKT_FMT,
@@ -37,6 +39,7 @@ class BaseBackend(object):
         memcacheConstants.CMD_QUIT: 'handle_quit',
         memcacheConstants.CMD_FLUSH: 'handle_flush',
         memcacheConstants.CMD_NOOP: 'handle_noop',
+        memcacheConstants.CMD_VERSION: 'handle_version',
         }
 
     def __init__(self):
@@ -136,6 +139,9 @@ class DictBackend(BaseBackend):
             print "Deleted", key
             rv=0, ''
         return rv
+
+    def handle_version(self, cmd, hdrs, key, data):
+        return 0, "Python test memcached server %s" % VERSION
 
 class MemcachedBinaryChannel(asyncore.dispatcher):
     """A channel implementing the binary protocol for memcached."""

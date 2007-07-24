@@ -82,6 +82,10 @@ class MemcachedClient(object):
         parts=self._doCmd(memcacheConstants.CMD_GET, key, '')
         return self.__parseGet(parts)
 
+    def version(self):
+        """Get the value for a given key within the memcached server."""
+        return self._doCmd(memcacheConstants.CMD_VERSION, '', '')
+
     def getMulti(self, keys):
         """Get values for any available keys in the given iterable.
 
