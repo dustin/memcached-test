@@ -95,6 +95,9 @@ class DictBackend(BaseBackend):
                 del self.storage[key]
             else:
                 rv = 0, struct.pack('>I', val[0]) + val[2]
+                print "Hit looking up", key
+        else:
+            print "Miss looking up", key
         return rv
 
     def handle_getq(self, cmd, hdrs, key, data):
