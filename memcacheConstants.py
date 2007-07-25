@@ -20,7 +20,11 @@ CMD_GETQ = 9
 CMD_NOOP = 10
 CMD_VERSION = 11
 
+# Flags, expiration
 SET_PKT_FMT=">II"
+
+# amount, initial value, expiration
+INCRDECR_PKT_FMT=">III"
 
 REQ_MAGIC_BYTE = 0xf
 

@@ -19,7 +19,9 @@ VERSION="1.0"
 EXTRA_HDR_FMTS={
     memcacheConstants.CMD_SET: memcacheConstants.SET_PKT_FMT,
     memcacheConstants.CMD_ADD: memcacheConstants.SET_PKT_FMT,
-    memcacheConstants.CMD_REPLACE: memcacheConstants.SET_PKT_FMT
+    memcacheConstants.CMD_REPLACE: memcacheConstants.SET_PKT_FMT,
+    memcacheConstants.CMD_INCR: memcacheConstants.INCRDECR_PKT_FMT,
+    memcacheConstants.CMD_DECR: memcacheConstants.INCRDECR_PKT_FMT
 }
 
 class BaseBackend(object):
@@ -35,7 +37,7 @@ class BaseBackend(object):
         memcacheConstants.CMD_REPLACE: 'handle_replace',
         memcacheConstants.CMD_DELETE: 'handle_delete',
         memcacheConstants.CMD_INCR: 'handle_incr',
-        memcacheConstants.CMD_DECR: 'handle_descr',
+        memcacheConstants.CMD_DECR: 'handle_decr',
         memcacheConstants.CMD_QUIT: 'handle_quit',
         memcacheConstants.CMD_FLUSH: 'handle_flush',
         memcacheConstants.CMD_NOOP: 'handle_noop',
@@ -114,6 +116,28 @@ class DictBackend(BaseBackend):
         self.storage[key]=(hdrs[0], time.time() + hdrs[1], data)
         print "Stored", self.storage[key], "in", key
         return 0, ''
+
+    def __handle_mutate(self, cmd, hdrs, key, data, incrMul):
+        amount, initial, expiration=hdrs
+        rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
+        val=self.storage.get(key, None)
+        print "Mutating %s, hdrs=%s, val=%s" % (key, `hdrs`, `val`)
+        if val:
+            val = (val[0], val[1], max(0, val[2] + (amount * incrMul)))
+            self.storage[key]=val
+            rv=0, struct.pack(">I", val[2])
+        else:
+            if expiration > 0:
+                self.storage[key]=(0, time.time() + expiration, initial)
+                rv=0, struct.pack(">I", initial)
+        print "Returning", rv
+        return rv
+
+    def handle_incr(self, cmd, hdrs, key, data):
+        return self.__handle_mutate(cmd, hdrs, key, data, 1)
+
+    def handle_decr(self, cmd, hdrs, key, data):
+        return self.__handle_mutate(cmd, hdrs, key, data, -1)
 
     def handle_add(self, cmd, hdrs, key, data):
         rv=memcacheConstants.ERR_EXISTS, 'Data exists for key'

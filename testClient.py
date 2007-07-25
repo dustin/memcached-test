@@ -32,7 +32,7 @@ class MemcachedError(exceptions.Exception):
 class MemcachedClient(object):
     """Simple memcached client."""
 
-    def __init__(self, host='127.0.0.1', port=11211):
+    def __init__(self, host='127.0.0.1', port=11212):
         self.s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.connect_ex((host, port))
         self.r=random.Random()
@@ -61,6 +61,18 @@ class MemcachedClient(object):
 
     def _mutate(self, cmd, key, exp, flags, val):
         self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp))
+
+    def __incrdecr(self, cmd, key, amt, exp, init):
+        return struct.unpack(">I", self._doCmd(cmd, key, '',
+            struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp)))
+
+    def incr(self, key, amt=1, exp=0, init=0):
+        """Increment or create the named counter."""
+        return self.__incrdecr(memcacheConstants.CMD_INCR, key, amt, exp, init)
+
+    def decr(self, key, amt=1, exp=0, init=0):
+        """Decrement or create the named counter."""
+        return self.__incrdecr(memcacheConstants.CMD_DECR, key, amt, exp, init)
 
     def set(self, key, exp, flags, val):
         """Set a value in the memcached server."""
