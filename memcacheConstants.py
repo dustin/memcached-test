@@ -21,10 +21,10 @@ CMD_NOOP = 10
 CMD_VERSION = 11
 
 # Flags, expiration
-SET_PKT_FMT=">II"
+SET_PKT_FMT=">Ii"
 
 # amount, initial value, expiration
-INCRDECR_PKT_FMT=">III"
+INCRDECR_PKT_FMT=">IIi"
 
 REQ_MAGIC_BYTE = 0xf
 

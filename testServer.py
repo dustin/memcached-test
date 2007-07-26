@@ -127,7 +127,7 @@ class DictBackend(BaseBackend):
             self.storage[key]=val
             rv=0, struct.pack(">I", val[2])
         else:
-            if expiration > 0:
+            if expiration >= 0:
                 self.storage[key]=(0, time.time() + expiration, initial)
                 rv=0, struct.pack(">I", initial)
         print "Returning", rv
