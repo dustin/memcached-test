@@ -102,12 +102,8 @@ class MemcachedClient(object):
         """Get values for any available keys in the given iterable.
 
         Returns a dict of matched keys to their values."""
-        opaqued={}
-        i=1
-        for key in keys:
-            opaqued[i] = key
-            i += 1
-        terminal=i+10
+        opaqued=dict(enumerate(keys))
+        terminal=len(opaqued)+10
         # Send all of the keys in quiet
         for k,v in opaqued.iteritems():
             self._sendCmd(memcacheConstants.CMD_GETQ, v, '', k)
