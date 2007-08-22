@@ -123,11 +123,11 @@ class DictBackend(BaseBackend):
         if val:
             val = (val[0], val[1], max(0, val[2] + amount))
             self.storage[key]=val
-            rv=0, struct.pack(">q", val[2])
+            rv=0, str(val[2])
         else:
             if expiration >= 0:
                 self.storage[key]=(0, time.time() + expiration, initial)
-                rv=0, struct.pack(">q", initial)
+                rv=0, str(initial)
         print "Returning", rv
         return rv
 

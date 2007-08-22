@@ -63,8 +63,8 @@ class MemcachedClient(object):
         self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp))
 
     def __incrdecr(self, cmd, key, amt, init, exp):
-        return struct.unpack(">q", self._doCmd(cmd, key, '',
-            struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp)))
+        return self._doCmd(cmd, key, '',
+            struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp))
 
     def incr(self, key, amt=1, init=0, exp=0):
         """Increment or create the named counter."""
