@@ -72,7 +72,7 @@ class MemcachedClient(object):
 
     def decr(self, key, amt=1, init=0, exp=0):
         """Decrement or create the named counter."""
-        return self.__incrdecr(memcacheConstants.CMD_DECR, key, 0-amt, init,
+        return self.__incrdecr(memcacheConstants.CMD_INCR, key, 0-amt, init,
             exp)
 
     def set(self, key, exp, flags, val):
