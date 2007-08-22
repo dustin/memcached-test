@@ -62,17 +62,18 @@ class MemcachedClient(object):
     def _mutate(self, cmd, key, exp, flags, val):
         self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp))
 
-    def __incrdecr(self, cmd, key, amt, exp, init):
+    def __incrdecr(self, cmd, key, amt, init, exp):
         return struct.unpack(">I", self._doCmd(cmd, key, '',
             struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp)))
 
-    def incr(self, key, amt=1, exp=0, init=0):
+    def incr(self, key, amt=1, init=0, exp=0):
         """Increment or create the named counter."""
-        return self.__incrdecr(memcacheConstants.CMD_INCR, key, amt, exp, init)
+        return self.__incrdecr(memcacheConstants.CMD_INCR, key, amt, init, exp)
 
-    def decr(self, key, amt=1, exp=0, init=0):
+    def decr(self, key, amt=1, init=0, exp=0):
         """Decrement or create the named counter."""
-        return self.__incrdecr(memcacheConstants.CMD_DECR, key, amt, exp, init)
+        return self.__incrdecr(memcacheConstants.CMD_DECR, key, 0-amt, init,
+            exp)
 
     def set(self, key, exp, flags, val):
         """Set a value in the memcached server."""
@@ -102,12 +103,8 @@ class MemcachedClient(object):
         """Get values for any available keys in the given iterable.
 
         Returns a dict of matched keys to their values."""
-        opaqued={}
-        i=1
-        for key in keys:
-            opaqued[i] = key
-            i += 1
-        terminal=i+10
+        opaqued=dict(enumerate(keys))
+        terminal=len(opaqued)+10
         # Send all of the keys in quiet
         for k,v in opaqued.iteritems():
             self._sendCmd(memcacheConstants.CMD_GETQ, v, '', k)
