@@ -23,7 +23,7 @@ CMD_VERSION = 10
 SET_PKT_FMT=">Ii"
 
 # amount, initial value, expiration
-INCRDECR_PKT_FMT=">IIi"
+INCRDECR_PKT_FMT=">qQi"
 
 REQ_MAGIC_BYTE = 0xf
 
