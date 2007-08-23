@@ -11,6 +11,8 @@ import random
 import struct
 import exceptions
 
+import unittest
+
 from memcacheConstants import REQ_MAGIC_BYTE, PKT_FMT, MIN_RECV_PACKET
 from memcacheConstants import SET_PKT_FMT
 import memcacheConstants
@@ -63,8 +65,8 @@ class MemcachedClient(object):
         self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp))
 
     def __incrdecr(self, cmd, key, amt, init, exp):
-        return self._doCmd(cmd, key, '',
-            struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp))
+        return long(self._doCmd(cmd, key, '',
+            struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp)))
 
     def incr(self, key, amt=1, init=0, exp=0):
         """Increment or create the named counter."""
@@ -134,3 +136,130 @@ class MemcachedClient(object):
     def flush(self):
         """Flush all storage in a memcached instance."""
         self._doCmd(memcacheConstants.CMD_FLUSH, '', '')
+
+class ComplianceTest(unittest.TestCase):
+
+    def setUp(self):
+        self.mc=MemcachedClient()
+
+    def tearDown(self):
+        self.mc.flush()
+
+    def testVersion(self):
+        """Test the version command returns something."""
+        v=self.mc.version()
+        self.assertTrue(len(v) > 0)
+
+    def testSimpleSetGet(self):
+        """Test a simple set and get."""
+        self.mc.set("x", 5, 19, "somevalue")
+        self.assertEquals((19, "somevalue"), self.mc.get("x"))
+
+    def assertNotExists(self, key):
+        try:
+            x=self.mc.get(key)
+            self.fail("Expected an exception, got " + `x`)
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
+
+    def testDelete(self):
+        """Test a set, get, delete, get sequence."""
+        self.mc.set("x", 5, 19, "somevalue")
+        self.assertEquals((19, "somevalue"), self.mc.get("x"))
+        self.mc.delete("x")
+        self.assertNotExists("x")
+
+    def testFlush(self):
+        """Test flushing."""
+        self.mc.set("x", 5, 19, "somevaluex")
+        self.mc.set("y", 5, 17, "somevaluey")
+        self.assertEquals((19, "somevaluex"), self.mc.get("x"))
+        self.assertEquals((17, "somevaluey"), self.mc.get("y"))
+        self.mc.flush()
+        self.assertNotExists("x")
+        self.assertNotExists("y")
+
+    def testNoop(self):
+        """Making sure noop is understood."""
+        self.mc.noop()
+
+    def testAdd(self):
+        """Test add functionality."""
+        self.assertNotExists("x")
+        self.mc.add("x", 5, 19, "ex")
+        self.assertEquals((19, "ex"), self.mc.get("x"))
+        try:
+            self.mc.add("x", 5, 19, "ex2")
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
+        self.assertEquals((19, "ex"), self.mc.get("x"))
+
+    def testReplace(self):
+        """Test replace functionality."""
+        self.assertNotExists("x")
+        try:
+            self.mc.replace("x", 5, 19, "ex")
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
+        self.mc.add("x", 5, 19, "ex")
+        self.assertEquals((19, "ex"), self.mc.get("x"))
+        self.mc.replace("x", 5, 19, "ex2")
+        self.assertEquals((19, "ex2"), self.mc.get("x"))
+
+    def testMultiGet(self):
+        """Testing multiget functionality"""
+        self.mc.add("x", 5, 1, "ex")
+        self.mc.add("y", 5, 2, "why")
+        vals=self.mc.getMulti('xyz')
+        self.assertEquals((1, 'ex'), vals['x'])
+        self.assertEquals((2, 'why'), vals['y'])
+        self.assertEquals(2, len(vals))
+
+    def testIncrDoesntExistNoCreate(self):
+        """Testing incr when a value doesn't exist (and not creating)."""
+        try:
+            self.mc.incr("x", exp=-1)
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
+        self.assertNotExists("x")
+
+    def testIncrDoesntExistCreate(self):
+        """Testing incr when a value doesn't exist (and we make a new one)"""
+        self.assertNotExists("x")
+        self.assertEquals(19, self.mc.incr("x", init=19))
+
+    def testDecrDoesntExistNoCreate(self):
+        """Testing decr when a value doesn't exist (and not creating)."""
+        try:
+            self.mc.decr("x", exp=-1)
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
+        self.assertNotExists("x")
+
+    def testDecrDoesntExistCreate(self):
+        """Testing decr when a value doesn't exist (and we make a new one)"""
+        self.assertNotExists("x")
+        self.assertEquals(19, self.mc.decr("x", init=19))
+
+    def testIncr(self):
+        """Simple incr test."""
+        val=self.mc.incr("x")
+        self.assertEquals(0, val)
+        val=self.mc.incr("x")
+        self.assertEquals(1, val)
+        val=self.mc.incr("x", 211)
+        self.assertEquals(212, val)
+        val=self.mc.incr("x", 2**33)
+        self.assertEquals(8589934804L, val)
+
+    def testDecr(self):
+        """Simple decr test."""
+        val=self.mc.incr("x", init=5)
+        self.assertEquals(5, val)
+        val=self.mc.decr("x")
+        self.assertEquals(4, val)
+        val=self.mc.decr("x", 211)
+        self.assertEquals(0, val)
+
+if __name__ == '__main__':
+    unittest.main()
