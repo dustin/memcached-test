@@ -39,6 +39,12 @@ class MemcachedClient(object):
         self.s.connect_ex((host, port))
         self.r=random.Random()
 
+    def close(self):
+        self.s.close()
+
+    def __del__(self):
+        self.close()
+
     def _sendCmd(self, cmd, key, val, opaque, extraHeader=''):
         msg=struct.pack(PKT_FMT, REQ_MAGIC_BYTE,
             cmd, len(key), opaque, len(key) + len(extraHeader) + len(val))
@@ -49,7 +55,7 @@ class MemcachedClient(object):
         assert len(response) == MIN_RECV_PACKET
         magic, cmd, errcode, opaque, remaining=struct.unpack(PKT_FMT, response)
         rv=self.s.recv(remaining)
-        assert magic == REQ_MAGIC_BYTE
+        assert magic == REQ_MAGIC_BYTE, "Got magic:  %d" % magic
         assert myopaque is None or opaque == myopaque
         if errcode != 0:
             raise MemcachedError(errcode,  rv)
@@ -144,6 +150,7 @@ class ComplianceTest(unittest.TestCase):
 
     def tearDown(self):
         self.mc.flush()
+        self.mc.close()
 
     def testVersion(self):
         """Test the version command returns something."""
