@@ -22,6 +22,9 @@ CMD_VERSION = 10
 # Flags, expiration
 SET_PKT_FMT=">Ii"
 
+# How long until the deletion takes effect.
+DEL_PKT_FMT=">i"
+
 # amount, initial value, expiration
 INCRDECR_PKT_FMT=">qQi"
 

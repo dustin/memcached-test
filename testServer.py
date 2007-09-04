@@ -21,6 +21,7 @@ EXTRA_HDR_FMTS={
     memcacheConstants.CMD_ADD: memcacheConstants.SET_PKT_FMT,
     memcacheConstants.CMD_REPLACE: memcacheConstants.SET_PKT_FMT,
     memcacheConstants.CMD_INCR: memcacheConstants.INCRDECR_PKT_FMT,
+    memcacheConstants.CMD_DELETE: memcacheConstants.DEL_PKT_FMT,
 }
 
 class BaseBackend(object):
@@ -87,6 +88,7 @@ class DictBackend(BaseBackend):
     def __init__(self):
         super(DictBackend, self).__init__()
         self.storage={}
+        self.held_keys={}
 
     def handle_get(self, cmd, hdrs, key, data):
         val=self.storage.get(key, None)
@@ -113,6 +115,8 @@ class DictBackend(BaseBackend):
     def handle_set(self, cmd, hdrs, key, data):
         self.storage[key]=(hdrs[0], time.time() + hdrs[1], data)
         print "Stored", self.storage[key], "in", key
+        if key in self.held_keys:
+            del self.held_keys[key]
         return 0, ''
 
     def handle_incr(self, cmd, hdrs, key, data):
@@ -131,20 +135,32 @@ class DictBackend(BaseBackend):
         print "Returning", rv
         return rv
 
+    def __has_hold(self, key):
+        rv=False
+        now=time.time()
+        print "Looking for hold of", key, "in", self.held_keys, "as of", now
+        if key in self.held_keys:
+            if time.time() > self.held_keys[key]:
+                del self.held_keys[key]
+            else:
+                rv=True
+        return rv
+
     def handle_add(self, cmd, hdrs, key, data):
         rv=memcacheConstants.ERR_EXISTS, 'Data exists for key'
-        if key not in self.storage:
+        if key not in self.storage and not self.__has_hold(key):
             rv=self.handle_set(cmd, hdrs, key, data)
         return rv
 
     def handle_replace(self, cmd, hdrs, key, data):
         rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
-        if key in self.storage:
+        if key in self.storage and not self.__has_hold(key):
             rv=self.handle_set(cmd, hdrs, key, data)
         return rv
 
     def handle_flush(self, cmd, hdrs, key, data):
         self.storage.clear()
+        self.held_keys.clear()
         print "Flushed"
         return 0, ''
 
@@ -152,7 +168,9 @@ class DictBackend(BaseBackend):
         rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
         if key in self.storage:
             del self.storage[key]
-            print "Deleted", key
+            print "Deleted", key, hdrs[0]
+            if hdrs[0] > 0:
+                self.held_keys[key] = time.time() + hdrs[0]
             rv=0, ''
         return rv
 

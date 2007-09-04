@@ -6,6 +6,7 @@ Copyright (c) 2007  Dustin Sallings <dustin@spy.net>
 """
 
 import sys
+import time
 import socket
 import random
 import struct
@@ -14,7 +15,7 @@ import exceptions
 import unittest
 
 from memcacheConstants import REQ_MAGIC_BYTE, PKT_FMT, MIN_RECV_PACKET
-from memcacheConstants import SET_PKT_FMT
+from memcacheConstants import SET_PKT_FMT, DEL_PKT_FMT
 import memcacheConstants
 
 class MemcachedError(exceptions.Exception):
@@ -135,9 +136,10 @@ class MemcachedClient(object):
         """Send a noop command."""
         self._doCmd(memcacheConstants.CMD_NOOP, '', '')
 
-    def delete(self, key):
+    def delete(self, key, when=0):
         """Delete the value for a given key within the memcached server."""
-        self._doCmd(memcacheConstants.CMD_DELETE, key, '')
+        self._doCmd(memcacheConstants.CMD_DELETE, key, '',
+            struct.pack(DEL_PKT_FMT, when))
 
     def flush(self):
         """Flush all storage in a memcached instance."""
@@ -155,7 +157,7 @@ class ComplianceTest(unittest.TestCase):
     def testVersion(self):
         """Test the version command returns something."""
         v=self.mc.version()
-        self.assertTrue(len(v) > 0)
+        self.assertTrue(len(v) > 0, "Bad version:  ``" + str(v) + "''")
 
     def testSimpleSetGet(self):
         """Test a simple set and get."""
@@ -175,6 +177,20 @@ class ComplianceTest(unittest.TestCase):
         self.assertEquals((19, "somevalue"), self.mc.get("x"))
         self.mc.delete("x")
         self.assertNotExists("x")
+
+    def testReservedDelete(self):
+        """Test a delete with a reservation timestamp."""
+        self.mc.set("x", 5, 19, "somevalue")
+        self.assertEquals((19, "somevalue"), self.mc.get("x"))
+        self.mc.delete("x", 1)
+        self.assertNotExists("x")
+        try:
+            self.mc.add("x", 5, 19, "ex2")
+            self.fail("Expected failure to add during timed delete")
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
+        time.sleep(1.1)
+        self.mc.add("x", 5, 19, "ex2")
 
     def testFlush(self):
         """Test flushing."""
@@ -197,6 +213,7 @@ class ComplianceTest(unittest.TestCase):
         self.assertEquals((19, "ex"), self.mc.get("x"))
         try:
             self.mc.add("x", 5, 19, "ex2")
+            self.fail("Expected failure to add existing key")
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
         self.assertEquals((19, "ex"), self.mc.get("x"))
@@ -206,6 +223,7 @@ class ComplianceTest(unittest.TestCase):
         self.assertNotExists("x")
         try:
             self.mc.replace("x", 5, 19, "ex")
+            self.fail("Expected failure to replace missing key")
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
         self.mc.add("x", 5, 19, "ex")
@@ -226,6 +244,7 @@ class ComplianceTest(unittest.TestCase):
         """Testing incr when a value doesn't exist (and not creating)."""
         try:
             self.mc.incr("x", exp=-1)
+            self.fail("Expected failure to increment non-existent key")
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
         self.assertNotExists("x")
@@ -239,6 +258,7 @@ class ComplianceTest(unittest.TestCase):
         """Testing decr when a value doesn't exist (and not creating)."""
         try:
             self.mc.decr("x", exp=-1)
+            self.fail("Expected failiure to decrement non-existent key.")
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
         self.assertNotExists("x")
