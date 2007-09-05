@@ -28,7 +28,8 @@ DEL_PKT_FMT=">i"
 # amount, initial value, expiration
 INCRDECR_PKT_FMT=">qQi"
 
-REQ_MAGIC_BYTE = 0xf
+REQ_MAGIC_BYTE = 0x0f
+RES_MAGIC_BYTE = 0xf0
 
 PKT_FMT=">BBBxII"
 # min recv packet size

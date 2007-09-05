@@ -12,7 +12,8 @@ import time
 
 import memcacheConstants
 
-from memcacheConstants import MIN_RECV_PACKET, PKT_FMT, REQ_MAGIC_BYTE
+from memcacheConstants import MIN_RECV_PACKET, PKT_FMT
+from memcacheConstants import REQ_MAGIC_BYTE, RES_MAGIC_BYTE
 
 VERSION="1.0"
 
@@ -215,7 +216,7 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
             # Queue the response to the client if applicable.
             if cmdVal:
                 status, response = cmdVal
-                self.wbuf += struct.pack(PKT_FMT, REQ_MAGIC_BYTE, cmd, status,
+                self.wbuf += struct.pack(PKT_FMT, RES_MAGIC_BYTE, cmd, status,
                     opaque, len(response)) + response
 
     def writable(self):

@@ -14,7 +14,8 @@ import exceptions
 
 import unittest
 
-from memcacheConstants import REQ_MAGIC_BYTE, PKT_FMT, MIN_RECV_PACKET
+from memcacheConstants import REQ_MAGIC_BYTE, RES_MAGIC_BYTE
+from memcacheConstants import PKT_FMT, MIN_RECV_PACKET
 from memcacheConstants import SET_PKT_FMT, DEL_PKT_FMT
 import memcacheConstants
 
@@ -56,7 +57,7 @@ class MemcachedClient(object):
         assert len(response) == MIN_RECV_PACKET
         magic, cmd, errcode, opaque, remaining=struct.unpack(PKT_FMT, response)
         rv=self.s.recv(remaining)
-        assert magic == REQ_MAGIC_BYTE, "Got magic:  %d" % magic
+        assert magic == RES_MAGIC_BYTE, "Got magic:  %d" % magic
         assert myopaque is None or opaque == myopaque
         if errcode != 0:
             raise MemcachedError(errcode,  rv)
