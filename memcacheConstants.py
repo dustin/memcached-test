@@ -19,8 +19,13 @@ CMD_GETQ = 8
 CMD_NOOP = 9
 CMD_VERSION = 10
 
+CMD_GETS = 50
+CMD_CAS = 51
+
 # Flags, expiration
 SET_PKT_FMT=">Ii"
+# flags, expiration, id
+CAS_PKT_FMT=">IiQ"
 
 # How long until the deletion takes effect.
 DEL_PKT_FMT=">i"

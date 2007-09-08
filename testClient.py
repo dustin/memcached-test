@@ -16,7 +16,7 @@ import unittest
 
 from memcacheConstants import REQ_MAGIC_BYTE, RES_MAGIC_BYTE
 from memcacheConstants import PKT_FMT, MIN_RECV_PACKET
-from memcacheConstants import SET_PKT_FMT, DEL_PKT_FMT
+from memcacheConstants import SET_PKT_FMT, DEL_PKT_FMT, CAS_PKT_FMT
 import memcacheConstants
 
 class MemcachedError(exceptions.Exception):
@@ -104,6 +104,17 @@ class MemcachedClient(object):
         """Get the value for a given key within the memcached server."""
         parts=self._doCmd(memcacheConstants.CMD_GET, key, '')
         return self.__parseGet(parts)
+
+    def gets(self, key):
+        """Get with an identifier (for cas)."""
+        data=self._doCmd(memcacheConstants.CMD_GETS, key, '')
+        parts=struct.unpack(">IQ", data[:12])
+        return parts[0], parts[1], data[12:]
+
+    def cas(self, key, exp, flags, oldVal, val):
+        """CAS in a new value for the given key and comparison value."""
+        self._doCmd(memcacheConstants.CMD_CAS, key, val,
+            struct.pack(CAS_PKT_FMT, flags, exp, oldVal))
 
     def version(self):
         """Get the value for a given key within the memcached server."""
@@ -288,6 +299,25 @@ class ComplianceTest(unittest.TestCase):
         self.assertEquals(4, val)
         val=self.mc.decr("x", 211)
         self.assertEquals(0, val)
+
+    def testCas(self):
+        """Test CAS operation."""
+        try:
+            self.mc.cas("x", 5, 19, 0, "bad value")
+            self.fail("Expected error CASing with no existing value")
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
+        self.mc.add("x", 5, 19, "original value")
+        flags, i, val=self.mc.gets("x")
+        self.assertEquals("original value", val)
+        try:
+            self.mc.cas("x", 5, 19, i+1, "broken value")
+            self.fail("Expected error CASing with invalid id")
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
+        self.mc.cas("x", 5, 19, i, "new value")
+        newflags, newi, newval=self.mc.gets("x")
+        self.assertEquals("new value", newval)
 
 if __name__ == '__main__':
     unittest.main()

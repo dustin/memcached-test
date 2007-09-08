@@ -23,6 +23,7 @@ EXTRA_HDR_FMTS={
     memcacheConstants.CMD_REPLACE: memcacheConstants.SET_PKT_FMT,
     memcacheConstants.CMD_INCR: memcacheConstants.INCRDECR_PKT_FMT,
     memcacheConstants.CMD_DELETE: memcacheConstants.DEL_PKT_FMT,
+    memcacheConstants.CMD_CAS: memcacheConstants.CAS_PKT_FMT,
 }
 
 class BaseBackend(object):
@@ -42,6 +43,8 @@ class BaseBackend(object):
         memcacheConstants.CMD_FLUSH: 'handle_flush',
         memcacheConstants.CMD_NOOP: 'handle_noop',
         memcacheConstants.CMD_VERSION: 'handle_version',
+        memcacheConstants.CMD_GETS: 'handle_gets',
+        memcacheConstants.CMD_CAS: 'handle_cas',
         }
 
     def __init__(self):
@@ -91,19 +94,44 @@ class DictBackend(BaseBackend):
         self.storage={}
         self.held_keys={}
 
-    def handle_get(self, cmd, hdrs, key, data):
-        val=self.storage.get(key, None)
-        rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
-        if val:
+    def __lookup(self, key):
+        rv=self.storage.get(key, None)
+        if rv:
             now=time.time()
-            if now >= val[1]:
+            if now >= rv[1]:
                 print key, "expired"
                 del self.storage[key]
-            else:
-                rv = 0, struct.pack('>I', val[0]) + val[2]
-                print "Hit looking up", key
+                rv=None
         else:
             print "Miss looking up", key
+        return rv
+
+    def handle_get(self, cmd, hdrs, key, data):
+        val=self.__lookup(key)
+        if val:
+            rv = 0, struct.pack('>I', val[0]) + val[2]
+        else:
+            rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
+        return rv
+
+    def handle_gets(self, cmd, hdrs, key, data):
+        val=self.__lookup(key)
+        if val:
+            rv = 0, struct.pack('>IQ', val[0], id(val)) + val[2]
+        else:
+            rv = memcacheConstants.ERR_NOT_FOUND, 'Not found'
+        return rv
+
+    def handle_cas(self, cmd, hdrs, key, data):
+        print "Handling a cas with", hdrs
+        val=self.__lookup(key)
+        exp, flags, oldVal=hdrs
+        if val and oldVal == id(val):
+            rv = self.handle_set(cmd, hdrs, key, data)
+        elif val:
+            rv = memcacheConstants.ERR_EXISTS, 'Exists'
+        else:
+            rv = memcacheConstants.ERR_NOT_FOUND, 'Not found'
         return rv
 
     def handle_getq(self, cmd, hdrs, key, data):
