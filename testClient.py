@@ -161,6 +161,7 @@ class ComplianceTest(unittest.TestCase):
 
     def setUp(self):
         self.mc=MemcachedClient()
+        self.mc.flush()
 
     def tearDown(self):
         self.mc.flush()
@@ -303,7 +304,7 @@ class ComplianceTest(unittest.TestCase):
     def testCas(self):
         """Test CAS operation."""
         try:
-            self.mc.cas("x", 5, 19, 0, "bad value")
+            self.mc.cas("x", 5, 19, 0x7fffffffff, "bad value")
             self.fail("Expected error CASing with no existing value")
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
@@ -316,6 +317,15 @@ class ComplianceTest(unittest.TestCase):
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
         self.mc.cas("x", 5, 19, i, "new value")
+        newflags, newi, newval=self.mc.gets("x")
+        self.assertEquals("new value", newval)
+
+        # Test a CAS replay
+        try:
+            self.mc.cas("x", 5, 19, i, "crap value")
+            self.fail("Expected error CASing with invalid id")
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
         newflags, newi, newval=self.mc.gets("x")
         self.assertEquals("new value", newval)
 
