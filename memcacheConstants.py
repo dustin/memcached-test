@@ -40,8 +40,9 @@ INCRDECR_PKT_FMT=">QQI"
 # Special incr expiration that means do not store
 INCRDECR_SPECIAL=0xffffffff
 
-REQ_MAGIC_BYTE = 0x0f
-RES_MAGIC_BYTE = 0xf0
+MAGIC_BYTE = 0x80
+REQ_MAGIC_BYTE = MAGIC_BYTE
+RES_MAGIC_BYTE = MAGIC_BYTE
 
 PKT_FMT=">BBHIII"
 # min recv packet size
