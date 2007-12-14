@@ -82,8 +82,7 @@ class MemcachedClient(object):
 
     def decr(self, key, amt=1, init=0, exp=0):
         """Decrement or create the named counter."""
-        return self.__incrdecr(memcacheConstants.CMD_INCR, key, 0-amt, init,
-            exp)
+        return self.__incrdecr(memcacheConstants.CMD_DECR, key, amt, init, exp)
 
     def set(self, key, exp, flags, val):
         """Set a value in the memcached server."""
@@ -98,7 +97,8 @@ class MemcachedClient(object):
         self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags, val)
 
     def __parseGet(self, data):
-        return struct.unpack(">I", data[:4])[0], data[4:]
+        return (struct.unpack(memcacheConstants.GET_RES_FMT, data[:12])[0],
+            data[12:])
 
     def get(self, key):
         """Get the value for a given key within the memcached server."""
@@ -256,7 +256,7 @@ class ComplianceTest(unittest.TestCase):
     def testIncrDoesntExistNoCreate(self):
         """Testing incr when a value doesn't exist (and not creating)."""
         try:
-            self.mc.incr("x", exp=-1)
+            self.mc.incr("x", exp=memcacheConstants.INCRDECR_SPECIAL)
             self.fail("Expected failure to increment non-existent key")
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
@@ -270,7 +270,7 @@ class ComplianceTest(unittest.TestCase):
     def testDecrDoesntExistNoCreate(self):
         """Testing decr when a value doesn't exist (and not creating)."""
         try:
-            self.mc.decr("x", exp=-1)
+            self.mc.decr("x", exp=memcacheConstants.INCRDECR_SPECIAL)
             self.fail("Expected failiure to decrement non-existent key.")
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)

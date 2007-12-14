@@ -19,19 +19,26 @@ CMD_GETQ = 8
 CMD_NOOP = 9
 CMD_VERSION = 10
 
+CMD_DECR = 11
+
 CMD_GETS = 50
 CMD_CAS = 51
 
 # Flags, expiration
-SET_PKT_FMT=">Ii"
+SET_PKT_FMT=">II"
 # flags, expiration, id
-CAS_PKT_FMT=">IiQ"
+CAS_PKT_FMT=">IIQ"
+
+# flags
+GET_RES_FMT=">IQ"
 
 # How long until the deletion takes effect.
-DEL_PKT_FMT=">i"
+DEL_PKT_FMT=">I"
 
 # amount, initial value, expiration
-INCRDECR_PKT_FMT=">qQi"
+INCRDECR_PKT_FMT=">QQI"
+# Special incr expiration that means do not store
+INCRDECR_SPECIAL=0xffffffff
 
 REQ_MAGIC_BYTE = 0x0f
 RES_MAGIC_BYTE = 0xf0
@@ -39,7 +46,6 @@ RES_MAGIC_BYTE = 0xf0
 PKT_FMT=">BBBxII"
 # min recv packet size
 MIN_RECV_PACKET = struct.calcsize(PKT_FMT)
-
 
 ERR_UNKNOWN_CMD = 0x81
 ERR_NOT_FOUND = 0x1

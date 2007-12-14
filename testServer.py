@@ -22,6 +22,7 @@ EXTRA_HDR_FMTS={
     memcacheConstants.CMD_ADD: memcacheConstants.SET_PKT_FMT,
     memcacheConstants.CMD_REPLACE: memcacheConstants.SET_PKT_FMT,
     memcacheConstants.CMD_INCR: memcacheConstants.INCRDECR_PKT_FMT,
+    memcacheConstants.CMD_DECR: memcacheConstants.INCRDECR_PKT_FMT,
     memcacheConstants.CMD_DELETE: memcacheConstants.DEL_PKT_FMT,
     memcacheConstants.CMD_CAS: memcacheConstants.CAS_PKT_FMT,
 }
@@ -39,6 +40,7 @@ class BaseBackend(object):
         memcacheConstants.CMD_REPLACE: 'handle_replace',
         memcacheConstants.CMD_DELETE: 'handle_delete',
         memcacheConstants.CMD_INCR: 'handle_incr',
+        memcacheConstants.CMD_DECR: 'handle_decr',
         memcacheConstants.CMD_QUIT: 'handle_quit',
         memcacheConstants.CMD_FLUSH: 'handle_flush',
         memcacheConstants.CMD_NOOP: 'handle_noop',
@@ -109,7 +111,8 @@ class DictBackend(BaseBackend):
     def handle_get(self, cmd, hdrs, key, data):
         val=self.__lookup(key)
         if val:
-            rv = 0, struct.pack('>I', val[0]) + val[2]
+            rv = 0, struct.pack(
+                memcacheConstants.GET_RES_FMT, val[0], id(val)) + val[2]
         else:
             rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
         return rv
@@ -117,7 +120,8 @@ class DictBackend(BaseBackend):
     def handle_gets(self, cmd, hdrs, key, data):
         val=self.__lookup(key)
         if val:
-            rv = 0, struct.pack('>IQ', val[0], id(val)) + val[2]
+            rv = 0, struct.pack(
+                memcacheConstants.GET_RES_FMT, val[0], id(val)) + val[2]
         else:
             rv = memcacheConstants.ERR_NOT_FOUND, 'Not found'
         return rv
@@ -148,21 +152,28 @@ class DictBackend(BaseBackend):
             del self.held_keys[key]
         return 0, ''
 
-    def handle_incr(self, cmd, hdrs, key, data):
+    def __mutation(self, cmd, hdrs, key, data, multiplier):
         amount, initial, expiration=hdrs
         rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
         val=self.storage.get(key, None)
-        print "Mutating %s, hdrs=%s, val=%s" % (key, `hdrs`, `val`)
+        print "Mutating %s, hdrs=%s, val=%s %s" % (key, `hdrs`, `val`,
+            multiplier)
         if val:
-            val = (val[0], val[1], max(0, val[2] + amount))
+            val = (val[0], val[1], max(0, val[2] + (multiplier * amount)))
             self.storage[key]=val
             rv=0, str(val[2])
         else:
-            if expiration >= 0:
+            if expiration != memcacheConstants.INCRDECR_SPECIAL:
                 self.storage[key]=(0, time.time() + expiration, initial)
                 rv=0, str(initial)
         print "Returning", rv
         return rv
+
+    def handle_incr(self, cmd, hdrs, key, data):
+        return self.__mutation(cmd, hdrs, key, data, 1)
+
+    def handle_decr(self, cmd, hdrs, key, data):
+        return self.__mutation(cmd, hdrs, key, data, -1)
 
     def __has_hold(self, key):
         rv=False
