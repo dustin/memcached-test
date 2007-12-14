@@ -24,7 +24,6 @@ EXTRA_HDR_FMTS={
     memcacheConstants.CMD_INCR: memcacheConstants.INCRDECR_PKT_FMT,
     memcacheConstants.CMD_DECR: memcacheConstants.INCRDECR_PKT_FMT,
     memcacheConstants.CMD_DELETE: memcacheConstants.DEL_PKT_FMT,
-    memcacheConstants.CMD_CAS: memcacheConstants.CAS_PKT_FMT,
 }
 
 class BaseBackend(object):
@@ -45,8 +44,6 @@ class BaseBackend(object):
         memcacheConstants.CMD_FLUSH: 'handle_flush',
         memcacheConstants.CMD_NOOP: 'handle_noop',
         memcacheConstants.CMD_VERSION: 'handle_version',
-        memcacheConstants.CMD_GETS: 'handle_gets',
-        memcacheConstants.CMD_CAS: 'handle_set',
         }
 
     def __init__(self):
@@ -117,17 +114,8 @@ class DictBackend(BaseBackend):
             rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
         return rv
 
-    def handle_gets(self, cmd, hdrs, key, data):
-        val=self.__lookup(key)
-        if val:
-            rv = 0, struct.pack(
-                memcacheConstants.GET_RES_FMT, val[0], id(val)) + val[2]
-        else:
-            rv = memcacheConstants.ERR_NOT_FOUND, 'Not found'
-        return rv
-
     def handle_set(self, cmd, hdrs, key, data):
-        print "Handling a cas with", hdrs
+        print "Handling a set with", hdrs
         val=self.__lookup(key)
         exp, flags, oldVal=hdrs
         if oldVal == 0 or (val and oldVal == id(val)):

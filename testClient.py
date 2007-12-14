@@ -98,19 +98,13 @@ class MemcachedClient(object):
         self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags, 0, val)
 
     def __parseGet(self, data):
-        return (struct.unpack(memcacheConstants.GET_RES_FMT, data[:12])[0],
-            data[12:])
+        parts=struct.unpack(memcacheConstants.GET_RES_FMT, data[:12])
+        return parts[0], parts[1], data[12:]
 
     def get(self, key):
         """Get the value for a given key within the memcached server."""
         parts=self._doCmd(memcacheConstants.CMD_GET, key, '')
         return self.__parseGet(parts)
-
-    def gets(self, key):
-        """Get with an identifier (for cas)."""
-        data=self._doCmd(memcacheConstants.CMD_GETS, key, '')
-        parts=struct.unpack(">IQ", data[:12])
-        return parts[0], parts[1], data[12:]
 
     def cas(self, key, exp, flags, oldVal, val):
         """CAS in a new value for the given key and comparison value."""
@@ -176,7 +170,7 @@ class ComplianceTest(unittest.TestCase):
     def testSimpleSetGet(self):
         """Test a simple set and get."""
         self.mc.set("x", 5, 19, "somevalue")
-        self.assertEquals((19, "somevalue"), self.mc.get("x"))
+        self.assertGet((19, "somevalue"), self.mc.get("x"))
 
     def assertNotExists(self, key):
         try:
@@ -185,17 +179,21 @@ class ComplianceTest(unittest.TestCase):
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
 
+    def assertGet(self, exp, gv):
+        self.assertTrue(gv is not None)
+        self.assertEquals((gv[0], gv[2]), exp)
+
     def testDelete(self):
         """Test a set, get, delete, get sequence."""
         self.mc.set("x", 5, 19, "somevalue")
-        self.assertEquals((19, "somevalue"), self.mc.get("x"))
+        self.assertGet((19, "somevalue"), self.mc.get("x"))
         self.mc.delete("x")
         self.assertNotExists("x")
 
     def testReservedDelete(self):
         """Test a delete with a reservation timestamp."""
         self.mc.set("x", 5, 19, "somevalue")
-        self.assertEquals((19, "somevalue"), self.mc.get("x"))
+        self.assertGet((19, "somevalue"), self.mc.get("x"))
         self.mc.delete("x", 1)
         self.assertNotExists("x")
         try:
@@ -210,8 +208,8 @@ class ComplianceTest(unittest.TestCase):
         """Test flushing."""
         self.mc.set("x", 5, 19, "somevaluex")
         self.mc.set("y", 5, 17, "somevaluey")
-        self.assertEquals((19, "somevaluex"), self.mc.get("x"))
-        self.assertEquals((17, "somevaluey"), self.mc.get("y"))
+        self.assertGet((19, "somevaluex"), self.mc.get("x"))
+        self.assertGet((17, "somevaluey"), self.mc.get("y"))
         self.mc.flush()
         self.assertNotExists("x")
         self.assertNotExists("y")
@@ -224,13 +222,13 @@ class ComplianceTest(unittest.TestCase):
         """Test add functionality."""
         self.assertNotExists("x")
         self.mc.add("x", 5, 19, "ex")
-        self.assertEquals((19, "ex"), self.mc.get("x"))
+        self.assertGet((19, "ex"), self.mc.get("x"))
         try:
             self.mc.add("x", 5, 19, "ex2")
             self.fail("Expected failure to add existing key")
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
-        self.assertEquals((19, "ex"), self.mc.get("x"))
+        self.assertGet((19, "ex"), self.mc.get("x"))
 
     def testReplace(self):
         """Test replace functionality."""
@@ -241,17 +239,17 @@ class ComplianceTest(unittest.TestCase):
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
         self.mc.add("x", 5, 19, "ex")
-        self.assertEquals((19, "ex"), self.mc.get("x"))
+        self.assertGet((19, "ex"), self.mc.get("x"))
         self.mc.replace("x", 5, 19, "ex2")
-        self.assertEquals((19, "ex2"), self.mc.get("x"))
+        self.assertGet((19, "ex2"), self.mc.get("x"))
 
     def testMultiGet(self):
         """Testing multiget functionality"""
         self.mc.add("x", 5, 1, "ex")
         self.mc.add("y", 5, 2, "why")
         vals=self.mc.getMulti('xyz')
-        self.assertEquals((1, 'ex'), vals['x'])
-        self.assertEquals((2, 'why'), vals['y'])
+        self.assertGet((1, 'ex'), vals['x'])
+        self.assertGet((2, 'why'), vals['y'])
         self.assertEquals(2, len(vals))
 
     def testIncrDoesntExistNoCreate(self):
@@ -310,7 +308,7 @@ class ComplianceTest(unittest.TestCase):
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
         self.mc.add("x", 5, 19, "original value")
-        flags, i, val=self.mc.gets("x")
+        flags, i, val=self.mc.get("x")
         self.assertEquals("original value", val)
         try:
             self.mc.cas("x", 5, 19, i+1, "broken value")
@@ -318,7 +316,7 @@ class ComplianceTest(unittest.TestCase):
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
         self.mc.cas("x", 5, 19, i, "new value")
-        newflags, newi, newval=self.mc.gets("x")
+        newflags, newi, newval=self.mc.get("x")
         self.assertEquals("new value", newval)
 
         # Test a CAS replay
@@ -327,7 +325,7 @@ class ComplianceTest(unittest.TestCase):
             self.fail("Expected error CASing with invalid id")
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
-        newflags, newi, newval=self.mc.gets("x")
+        newflags, newi, newval=self.mc.get("x")
         self.assertEquals("new value", newval)
 
 if __name__ == '__main__':

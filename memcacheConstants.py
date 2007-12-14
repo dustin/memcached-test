@@ -13,23 +13,19 @@ CMD_ADD = 2
 CMD_REPLACE = 3
 CMD_DELETE = 4
 CMD_INCR = 5
-CMD_QUIT = 6
-CMD_FLUSH = 7
-CMD_GETQ = 8
-CMD_NOOP = 9
-CMD_VERSION = 10
-
-CMD_DECR = 11
-
-CMD_GETS = 50
-CMD_CAS = 51
+CMD_DECR = 6
+CMD_QUIT = 7
+CMD_FLUSH = 8
+CMD_GETQ = 9
+CMD_NOOP = 10
+CMD_VERSION = 11
 
 # Flags, expiration, cas ID
 SET_PKT_FMT=">IIQ"
 # flags, expiration, id
 CAS_PKT_FMT=">IIQ"
 
-# flags
+# flags, cas ID
 GET_RES_FMT=">IQ"
 
 # How long until the deletion takes effect.
