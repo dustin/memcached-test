@@ -49,13 +49,14 @@ class MemcachedClient(object):
 
     def _sendCmd(self, cmd, key, val, opaque, extraHeader=''):
         msg=struct.pack(PKT_FMT, REQ_MAGIC_BYTE,
-            cmd, len(key), opaque, len(key) + len(extraHeader) + len(val))
+            cmd, len(key), opaque, len(key) + len(extraHeader) + len(val), 0)
         self.s.send(msg + extraHeader + key + val)
 
     def _handleSingleResponse(self, myopaque):
         response=self.s.recv(MIN_RECV_PACKET)
         assert len(response) == MIN_RECV_PACKET
-        magic, cmd, errcode, opaque, remaining=struct.unpack(PKT_FMT, response)
+        magic, cmd, errcode, opaque, remaining, reserved=struct.unpack(
+            PKT_FMT, response)
         rv=self.s.recv(remaining)
         assert magic == RES_MAGIC_BYTE, "Got magic:  %d" % magic
         assert myopaque is None or opaque == myopaque

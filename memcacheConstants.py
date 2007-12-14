@@ -43,7 +43,7 @@ INCRDECR_SPECIAL=0xffffffff
 REQ_MAGIC_BYTE = 0x0f
 RES_MAGIC_BYTE = 0xf0
 
-PKT_FMT=">BBBxII"
+PKT_FMT=">BBHIII"
 # min recv packet size
 MIN_RECV_PACKET = struct.calcsize(PKT_FMT)
 
