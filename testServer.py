@@ -46,7 +46,7 @@ class BaseBackend(object):
         memcacheConstants.CMD_NOOP: 'handle_noop',
         memcacheConstants.CMD_VERSION: 'handle_version',
         memcacheConstants.CMD_GETS: 'handle_gets',
-        memcacheConstants.CMD_CAS: 'handle_cas',
+        memcacheConstants.CMD_CAS: 'handle_set',
         }
 
     def __init__(self):
@@ -126,12 +126,12 @@ class DictBackend(BaseBackend):
             rv = memcacheConstants.ERR_NOT_FOUND, 'Not found'
         return rv
 
-    def handle_cas(self, cmd, hdrs, key, data):
+    def handle_set(self, cmd, hdrs, key, data):
         print "Handling a cas with", hdrs
         val=self.__lookup(key)
         exp, flags, oldVal=hdrs
-        if val and oldVal == id(val):
-            rv = self.handle_set(cmd, hdrs, key, data)
+        if oldVal == 0 or (val and oldVal == id(val)):
+            rv = self.__handle_unconditional_set(cmd, hdrs, key, data)
         elif val:
             rv = memcacheConstants.ERR_EXISTS, 'Exists'
         else:
@@ -145,7 +145,7 @@ class DictBackend(BaseBackend):
             rv = None
         return rv
 
-    def handle_set(self, cmd, hdrs, key, data):
+    def __handle_unconditional_set(self, cmd, hdrs, key, data):
         self.storage[key]=(hdrs[0], time.time() + hdrs[1], data)
         print "Stored", self.storage[key], "in", key
         if key in self.held_keys:
@@ -189,13 +189,13 @@ class DictBackend(BaseBackend):
     def handle_add(self, cmd, hdrs, key, data):
         rv=memcacheConstants.ERR_EXISTS, 'Data exists for key'
         if key not in self.storage and not self.__has_hold(key):
-            rv=self.handle_set(cmd, hdrs, key, data)
+            rv=self.__handle_unconditional_set(cmd, hdrs, key, data)
         return rv
 
     def handle_replace(self, cmd, hdrs, key, data):
         rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
         if key in self.storage and not self.__has_hold(key):
-            rv=self.handle_set(cmd, hdrs, key, data)
+            rv=self.__handle_unconditional_set(cmd, hdrs, key, data)
         return rv
 
     def handle_flush(self, cmd, hdrs, key, data):

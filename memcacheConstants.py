@@ -24,8 +24,8 @@ CMD_DECR = 11
 CMD_GETS = 50
 CMD_CAS = 51
 
-# Flags, expiration
-SET_PKT_FMT=">II"
+# Flags, expiration, cas ID
+SET_PKT_FMT=">IIQ"
 # flags, expiration, id
 CAS_PKT_FMT=">IIQ"
 

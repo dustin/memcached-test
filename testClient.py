@@ -70,8 +70,8 @@ class MemcachedClient(object):
         self._sendCmd(cmd, key, val, opaque, extraHeader)
         return self._handleSingleResponse(opaque)[1]
 
-    def _mutate(self, cmd, key, exp, flags, val):
-        self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp))
+    def _mutate(self, cmd, key, exp, flags, cas, val):
+        self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp, cas))
 
     def __incrdecr(self, cmd, key, amt, init, exp):
         return long(self._doCmd(cmd, key, '',
@@ -87,15 +87,15 @@ class MemcachedClient(object):
 
     def set(self, key, exp, flags, val):
         """Set a value in the memcached server."""
-        self._mutate(memcacheConstants.CMD_SET, key, exp, flags, val)
+        self._mutate(memcacheConstants.CMD_SET, key, exp, flags, 0, val)
 
     def add(self, key, exp, flags, val):
         """Add a value in the memcached server iff it doesn't already exist."""
-        self._mutate(memcacheConstants.CMD_ADD, key, exp, flags, val)
+        self._mutate(memcacheConstants.CMD_ADD, key, exp, flags, 0, val)
 
     def replace(self, key, exp, flags, val):
         """Replace a value in the memcached server iff it already exists."""
-        self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags, val)
+        self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags, 0, val)
 
     def __parseGet(self, data):
         return (struct.unpack(memcacheConstants.GET_RES_FMT, data[:12])[0],
@@ -114,8 +114,8 @@ class MemcachedClient(object):
 
     def cas(self, key, exp, flags, oldVal, val):
         """CAS in a new value for the given key and comparison value."""
-        self._doCmd(memcacheConstants.CMD_CAS, key, val,
-            struct.pack(CAS_PKT_FMT, flags, exp, oldVal))
+        self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags,
+            oldVal, val)
 
     def version(self):
         """Get the value for a given key within the memcached server."""
