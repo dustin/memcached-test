@@ -15,7 +15,7 @@ import exceptions
 import unittest
 
 from memcacheConstants import REQ_MAGIC_BYTE, RES_MAGIC_BYTE
-from memcacheConstants import PKT_FMT, MIN_RECV_PACKET
+from memcacheConstants import REQ_PKT_FMT, RES_PKT_FMT, MIN_RECV_PACKET
 from memcacheConstants import SET_PKT_FMT, DEL_PKT_FMT, CAS_PKT_FMT
 import memcacheConstants
 
@@ -48,15 +48,17 @@ class MemcachedClient(object):
         self.close()
 
     def _sendCmd(self, cmd, key, val, opaque, extraHeader=''):
-        msg=struct.pack(PKT_FMT, REQ_MAGIC_BYTE,
-            cmd, len(key), opaque, len(key) + len(extraHeader) + len(val), 0)
+        dtype=0
+        msg=struct.pack(REQ_PKT_FMT, REQ_MAGIC_BYTE,
+            cmd, len(key), len(extraHeader), dtype,
+                len(key) + len(extraHeader) + len(val), opaque)
         self.s.send(msg + extraHeader + key + val)
 
     def _handleSingleResponse(self, myopaque):
         response=self.s.recv(MIN_RECV_PACKET)
         assert len(response) == MIN_RECV_PACKET
-        magic, cmd, errcode, opaque, remaining, reserved=struct.unpack(
-            PKT_FMT, response)
+        magic, cmd, errcode, extralen, dtype, remaining, opaque=\
+            struct.unpack(RES_PKT_FMT, response)
         rv=self.s.recv(remaining)
         assert magic == RES_MAGIC_BYTE, "Got magic:  %d" % magic
         assert myopaque is None or opaque == myopaque

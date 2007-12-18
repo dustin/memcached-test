@@ -12,19 +12,10 @@ import time
 
 import memcacheConstants
 
-from memcacheConstants import MIN_RECV_PACKET, PKT_FMT
-from memcacheConstants import REQ_MAGIC_BYTE, RES_MAGIC_BYTE
+from memcacheConstants import MIN_RECV_PACKET, REQ_PKT_FMT, RES_PKT_FMT
+from memcacheConstants import REQ_MAGIC_BYTE, RES_MAGIC_BYTE, EXTRA_HDR_FMTS
 
 VERSION="1.0"
-
-EXTRA_HDR_FMTS={
-    memcacheConstants.CMD_SET: memcacheConstants.SET_PKT_FMT,
-    memcacheConstants.CMD_ADD: memcacheConstants.SET_PKT_FMT,
-    memcacheConstants.CMD_REPLACE: memcacheConstants.SET_PKT_FMT,
-    memcacheConstants.CMD_INCR: memcacheConstants.INCRDECR_PKT_FMT,
-    memcacheConstants.CMD_DECR: memcacheConstants.INCRDECR_PKT_FMT,
-    memcacheConstants.CMD_DELETE: memcacheConstants.DEL_PKT_FMT,
-}
 
 class BaseBackend(object):
     """Higher-level backend (processes commands and stuff)."""
@@ -221,16 +212,16 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
     def __hasEnoughBytes(self):
         rv=False
         if len(self.rbuf) >= MIN_RECV_PACKET:
-            magic, cmd, keylen, opaque, remaining, reserved=\
-                struct.unpack(PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
+            magic, cmd, keylen, extralen, datatype, remaining, opaque=\
+                struct.unpack(REQ_PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
             rv = len(self.rbuf) - MIN_RECV_PACKET >= remaining
         return rv
 
     def handle_read(self):
         self.rbuf += self.recv(self.BUFFER_SIZE)
         while self.__hasEnoughBytes():
-            magic, cmd, keylen, opaque, remaining, reserved=\
-                struct.unpack(PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
+            magic, cmd, keylen, extralen, datatype, remaining, opaque=\
+                struct.unpack(REQ_PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
             assert magic == REQ_MAGIC_BYTE
             assert keylen <= remaining
             # Grab the data section of this request
@@ -243,8 +234,11 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
             # Queue the response to the client if applicable.
             if cmdVal:
                 status, response = cmdVal
-                self.wbuf += struct.pack(PKT_FMT, RES_MAGIC_BYTE, cmd, status,
-                    opaque, len(response), 0) + response
+                dtype=0
+                # XXX:  Need to look this up.
+                extralen=0
+                self.wbuf += struct.pack(RES_PKT_FMT, RES_MAGIC_BYTE, cmd,
+                    status, extralen, dtype, len(response), opaque) + response
 
     def writable(self):
         return self.wbuf

@@ -40,9 +40,21 @@ MAGIC_BYTE = 0x80
 REQ_MAGIC_BYTE = MAGIC_BYTE
 RES_MAGIC_BYTE = MAGIC_BYTE
 
-PKT_FMT=">BBHIII"
+# magic, opcode, keylen, extralen, datatype, [reserved], bodylen, opaque
+REQ_PKT_FMT=">BBHBBxxII"
+# magic, opcode, status, extralen, datatype, [reserved], bodylen, opaque
+RES_PKT_FMT=">BBHBBxxII"
 # min recv packet size
-MIN_RECV_PACKET = struct.calcsize(PKT_FMT)
+MIN_RECV_PACKET = struct.calcsize(REQ_PKT_FMT)
+
+EXTRA_HDR_FMTS={
+    CMD_SET: SET_PKT_FMT,
+    CMD_ADD: SET_PKT_FMT,
+    CMD_REPLACE: SET_PKT_FMT,
+    CMD_INCR: INCRDECR_PKT_FMT,
+    CMD_DECR: INCRDECR_PKT_FMT,
+    CMD_DELETE: DEL_PKT_FMT,
+}
 
 ERR_UNKNOWN_CMD = 0x81
 ERR_NOT_FOUND = 0x1
