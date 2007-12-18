@@ -59,7 +59,10 @@ class MemcachedClient(object):
         assert len(response) == MIN_RECV_PACKET
         magic, cmd, errcode, extralen, dtype, remaining, opaque=\
             struct.unpack(RES_PKT_FMT, response)
-        rv=self.s.recv(remaining)
+        if remaining > 0:
+            rv=self.s.recv(remaining)
+        else:
+            rv=""
         assert magic == RES_MAGIC_BYTE, "Got magic:  %d" % magic
         assert myopaque is None or opaque == myopaque
         if errcode != 0:
