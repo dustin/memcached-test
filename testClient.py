@@ -108,7 +108,7 @@ class MemcachedClient(object):
 
     def cas(self, key, exp, flags, oldVal, val):
         """CAS in a new value for the given key and comparison value."""
-        self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags,
+        self._mutate(memcacheConstants.CMD_SET, key, exp, flags,
             oldVal, val)
 
     def version(self):
