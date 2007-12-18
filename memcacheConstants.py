@@ -56,6 +56,9 @@ EXTRA_HDR_FMTS={
     CMD_DELETE: DEL_PKT_FMT,
 }
 
+EXTRA_HDR_SIZES=dict(
+    [(k, struct.calcsize(v)) for (k,v) in EXTRA_HDR_FMTS.items()])
+
 ERR_UNKNOWN_CMD = 0x81
 ERR_NOT_FOUND = 0x1
 ERR_EXISTS = 0x2

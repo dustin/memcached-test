@@ -224,6 +224,7 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
                 struct.unpack(REQ_PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
             assert magic == REQ_MAGIC_BYTE
             assert keylen <= remaining
+            assert extralen == memcacheConstants.EXTRA_HDR_SIZES.get(cmd, 0)
             # Grab the data section of this request
             data=self.rbuf[MIN_RECV_PACKET:MIN_RECV_PACKET+remaining]
             assert len(data) == remaining
@@ -235,8 +236,7 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
             if cmdVal:
                 status, response = cmdVal
                 dtype=0
-                # XXX:  Need to look this up.
-                extralen=0
+                extralen=memcacheConstants.EXTRA_HDR_SIZES.get(cmd, 0)
                 self.wbuf += struct.pack(RES_PKT_FMT, RES_MAGIC_BYTE, cmd,
                     status, extralen, dtype, len(response), opaque) + response
 
