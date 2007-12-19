@@ -223,7 +223,8 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
             magic, cmd, keylen, extralen, datatype, remaining, opaque=\
                 struct.unpack(REQ_PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
             assert magic == REQ_MAGIC_BYTE
-            assert keylen <= remaining
+            assert keylen <= remaining, "Keylen is too big: %d > %d" \
+                % (keylen, remaining)
             assert extralen == memcacheConstants.EXTRA_HDR_SIZES.get(cmd, 0)
             # Grab the data section of this request
             data=self.rbuf[MIN_RECV_PACKET:MIN_RECV_PACKET+remaining]
