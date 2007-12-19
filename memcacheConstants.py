@@ -22,8 +22,6 @@ CMD_VERSION = 11
 
 # Flags, expiration, cas ID
 SET_PKT_FMT=">IIQ"
-# flags, expiration, id
-CAS_PKT_FMT=">IIQ"
 
 # flags, cas ID
 GET_RES_FMT=">IQ"

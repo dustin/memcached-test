@@ -16,7 +16,7 @@ import unittest
 
 from memcacheConstants import REQ_MAGIC_BYTE, RES_MAGIC_BYTE
 from memcacheConstants import REQ_PKT_FMT, RES_PKT_FMT, MIN_RECV_PACKET
-from memcacheConstants import SET_PKT_FMT, DEL_PKT_FMT, CAS_PKT_FMT
+from memcacheConstants import SET_PKT_FMT, DEL_PKT_FMT
 import memcacheConstants
 
 class MemcachedError(exceptions.Exception):
