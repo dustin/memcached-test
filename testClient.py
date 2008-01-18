@@ -16,7 +16,7 @@ import unittest
 
 from memcacheConstants import REQ_MAGIC_BYTE, RES_MAGIC_BYTE
 from memcacheConstants import REQ_PKT_FMT, RES_PKT_FMT, MIN_RECV_PACKET
-from memcacheConstants import SET_PKT_FMT, DEL_PKT_FMT
+from memcacheConstants import SET_PKT_FMT, DEL_PKT_FMT, INCRDECR_RES_FMT
 import memcacheConstants
 
 class MemcachedError(exceptions.Exception):
@@ -64,7 +64,8 @@ class MemcachedClient(object):
         else:
             rv=""
         assert magic == RES_MAGIC_BYTE, "Got magic:  %d" % magic
-        assert myopaque is None or opaque == myopaque
+        assert myopaque is None or opaque == myopaque, \
+            "expected opaque %x, got %x" % (myopaque, opaque)
         if errcode != 0:
             raise MemcachedError(errcode,  rv)
         return opaque, rv
@@ -79,8 +80,8 @@ class MemcachedClient(object):
         self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp, cas))
 
     def __incrdecr(self, cmd, key, amt, init, exp):
-        return long(self._doCmd(cmd, key, '',
-            struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp)))
+        return struct.unpack(INCRDECR_RES_FMT, self._doCmd(cmd, key, '',
+            struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp)))[0]
 
     def incr(self, key, amt=1, init=0, exp=0):
         """Increment or create the named counter."""

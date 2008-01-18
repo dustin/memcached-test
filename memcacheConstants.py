@@ -33,6 +33,7 @@ DEL_PKT_FMT=">I"
 INCRDECR_PKT_FMT=">QQI"
 # Special incr expiration that means do not store
 INCRDECR_SPECIAL=0xffffffff
+INCRDECR_RES_FMT=">Q"
 
 MAGIC_BYTE = 0x80
 REQ_MAGIC_BYTE = MAGIC_BYTE
