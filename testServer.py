@@ -101,7 +101,7 @@ class DictBackend(BaseBackend):
         val=self.__lookup(key)
         if val:
             rv = 0, struct.pack(
-                memcacheConstants.GET_RES_FMT, val[0], id(val)) + val[2]
+                memcacheConstants.GET_RES_FMT, id(val), val[0]) + val[2]
         else:
             rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
         return rv
@@ -109,7 +109,7 @@ class DictBackend(BaseBackend):
     def handle_set(self, cmd, hdrs, key, data):
         print "Handling a set with", hdrs
         val=self.__lookup(key)
-        exp, flags, oldVal=hdrs
+        oldVal, exp, flags=hdrs
         if oldVal == 0 or (val and oldVal == id(val)):
             rv = self.__handle_unconditional_set(cmd, hdrs, key, data)
         elif val:
@@ -126,7 +126,7 @@ class DictBackend(BaseBackend):
         return rv
 
     def __handle_unconditional_set(self, cmd, hdrs, key, data):
-        self.storage[key]=(hdrs[0], time.time() + hdrs[1], data)
+        self.storage[key]=(hdrs[1], time.time() + hdrs[2], data)
         print "Stored", self.storage[key], "in", key
         if key in self.held_keys:
             del self.held_keys[key]
@@ -275,5 +275,5 @@ class MemcachedServer(asyncore.dispatcher):
         self.handler(channel, self.backend)
 
 if __name__ == '__main__':
-    server = MemcachedServer(DictBackend(), MemcachedBinaryChannel, port=11212)
+    server = MemcachedServer(DictBackend(), MemcachedBinaryChannel, port=11211)
     asyncore.loop()

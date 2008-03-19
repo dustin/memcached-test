@@ -36,7 +36,7 @@ class MemcachedError(exceptions.Exception):
 class MemcachedClient(object):
     """Simple memcached client."""
 
-    def __init__(self, host='127.0.0.1', port=11212):
+    def __init__(self, host='127.0.0.1', port=11211):
         self.s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.connect_ex((host, port))
         self.r=random.Random()
@@ -77,7 +77,7 @@ class MemcachedClient(object):
         return self._handleSingleResponse(opaque)[1]
 
     def _mutate(self, cmd, key, exp, flags, cas, val):
-        self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp, cas))
+        self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, cas, flags, exp))
 
     def __incrdecr(self, cmd, key, amt, init, exp):
         return struct.unpack(INCRDECR_RES_FMT, self._doCmd(cmd, key, '',
@@ -105,7 +105,7 @@ class MemcachedClient(object):
 
     def __parseGet(self, data):
         parts=struct.unpack(memcacheConstants.GET_RES_FMT, data[:12])
-        return parts[0], parts[1], data[12:]
+        return parts[1], parts[0], data[12:]
 
     def get(self, key):
         """Get the value for a given key within the memcached server."""
