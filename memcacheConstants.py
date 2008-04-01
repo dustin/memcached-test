@@ -36,8 +36,8 @@ INCRDECR_SPECIAL=0xffffffff
 INCRDECR_RES_FMT=">Q"
 
 MAGIC_BYTE = 0x80
-REQ_MAGIC_BYTE = MAGIC_BYTE
-RES_MAGIC_BYTE = MAGIC_BYTE
+REQ_MAGIC_BYTE = 0x80
+RES_MAGIC_BYTE = 0x81
 
 # magic, opcode, keylen, extralen, datatype, [reserved], bodylen, opaque
 REQ_PKT_FMT=">BBHBBxxII"
