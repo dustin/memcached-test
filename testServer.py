@@ -9,6 +9,7 @@ import asyncore
 import socket
 import struct
 import time
+import heapq
 
 import memcacheConstants
 
@@ -42,6 +43,7 @@ class BaseBackend(object):
 
     def __init__(self):
         self.handlers={}
+        self.sched=[]
 
         for id, method in self.CMDS.iteritems():
             self.handlers[id]=getattr(self, method, self.handle_unknown)
@@ -67,6 +69,12 @@ class BaseBackend(object):
     def processCommand(self, cmd, keylen, cas, data):
         """Entry point for command processing.  Lower level protocol
         implementations deliver values here."""
+
+        now=time.time()
+        while self.sched and self.sched[0][0] <= now:
+            print "Running delayed job."
+            heapq.heappop(self.sched)[1]()
+
         hdrs, key, val=self._splitKeys(EXTRA_HDR_FMTS.get(cmd, ''),
             keylen, data)
 
@@ -184,9 +192,15 @@ class DictBackend(BaseBackend):
         return rv
 
     def handle_flush(self, cmd, hdrs, key, cas, data):
-        self.storage.clear()
-        self.held_keys.clear()
-        print "Flushed"
+        timebomb_delay=hdrs[0]
+        def f():
+            self.storage.clear()
+            self.held_keys.clear()
+            print "Flushed"
+        if timebomb_delay:
+            heapq.heappush(self.sched, (time.time() + timebomb_delay, f))
+        else:
+            f()
         return 0, 0, ''
 
     def handle_delete(self, cmd, hdrs, key, cas, data):
@@ -253,6 +267,8 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
             assert magic == REQ_MAGIC_BYTE
             assert keylen <= remaining, "Keylen is too big: %d > %d" \
                 % (keylen, remaining)
+            print "extralen=%d, expected=%d" % (extralen,
+                memcacheConstants.EXTRA_HDR_SIZES.get(cmd, 0))
             assert extralen == memcacheConstants.EXTRA_HDR_SIZES.get(cmd, 0)
             # Grab the data section of this request
             data=self.rbuf[MIN_RECV_PACKET:MIN_RECV_PACKET+remaining]

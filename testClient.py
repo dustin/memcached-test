@@ -159,16 +159,17 @@ class MemcachedClient(object):
 
     def noop(self):
         """Send a noop command."""
-        self._doCmd(memcacheConstants.CMD_NOOP, '', '')
+        return self._doCmd(memcacheConstants.CMD_NOOP, '', '')
 
     def delete(self, key, when=0, cas=0):
         """Delete the value for a given key within the memcached server."""
-        self._doCmd(memcacheConstants.CMD_DELETE, key, '',
+        return self._doCmd(memcacheConstants.CMD_DELETE, key, '',
             struct.pack(DEL_PKT_FMT, when), cas)
 
-    def flush(self):
+    def flush(self, timebomb=0):
         """Flush all storage in a memcached instance."""
-        self._doCmd(memcacheConstants.CMD_FLUSH, '', '')
+        return self._doCmd(memcacheConstants.CMD_FLUSH, '', '',
+            struct.pack(memcacheConstants.FLUSH_PKT_FMT, timebomb))
 
 class ComplianceTest(unittest.TestCase):
 
@@ -428,6 +429,14 @@ class ComplianceTest(unittest.TestCase):
         except MemcachedError, e:
             self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
         self.assertGet((19, 'some'), self.mc.get("x"))
+
+    def testTimeBombedFlush(self):
+        """Test a flush with a time bomb."""
+        val, cas, something=self.mc.set("x", 5, 19, "some")
+        self.mc.flush(1)
+        self.assertGet((19, 'some'), self.mc.get("x"))
+        time.sleep(1.1)
+        self.assertNotExists('x')
 
 if __name__ == '__main__':
     unittest.main()
