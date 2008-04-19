@@ -105,7 +105,7 @@ class DictBackend(BaseBackend):
         val=self.__lookup(key)
         if val:
             rv = 0, id(val), struct.pack(
-                memcacheConstants.GET_RES_FMT, val[0]) + val[2]
+                memcacheConstants.GET_RES_FMT, val[0]) + str(val[2])
         else:
             rv=self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
         return rv
@@ -144,7 +144,7 @@ class DictBackend(BaseBackend):
         print "Mutating %s, hdrs=%s, val=%s %s" % (key, `hdrs`, `val`,
             multiplier)
         if val:
-            val = (val[0], val[1], max(0, val[2] + (multiplier * amount)))
+            val = (val[0], val[1], max(0, long(val[2]) + (multiplier * amount)))
             self.storage[key]=val
             rv=0, id(val), str(val[2])
         else:
