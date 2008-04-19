@@ -77,13 +77,13 @@ class MemcachedClient(object):
         return self._handleSingleResponse(opaque)
 
     def _mutate(self, cmd, key, exp, flags, cas, val):
-        self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp), cas)
+        return self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp),
+            cas)
 
     def __incrdecr(self, cmd, key, amt, init, exp):
-        return struct.unpack(INCRDECR_RES_FMT,
-            self._doCmd(cmd, key, '',
-                struct.pack(memcacheConstants.INCRDECR_PKT_FMT,
-                    amt, init, exp))[-1])[0]
+        something, cas, val=self._doCmd(cmd, key, '',
+            struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp))
+        return struct.unpack(INCRDECR_RES_FMT, val)[0], cas
 
     def incr(self, key, amt=1, init=0, exp=0):
         """Increment or create the named counter."""
@@ -95,15 +95,16 @@ class MemcachedClient(object):
 
     def set(self, key, exp, flags, val):
         """Set a value in the memcached server."""
-        self._mutate(memcacheConstants.CMD_SET, key, exp, flags, 0, val)
+        return self._mutate(memcacheConstants.CMD_SET, key, exp, flags, 0, val)
 
     def add(self, key, exp, flags, val):
         """Add a value in the memcached server iff it doesn't already exist."""
-        self._mutate(memcacheConstants.CMD_ADD, key, exp, flags, 0, val)
+        return self._mutate(memcacheConstants.CMD_ADD, key, exp, flags, 0, val)
 
     def replace(self, key, exp, flags, val):
         """Replace a value in the memcached server iff it already exists."""
-        self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags, 0, val)
+        return self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags, 0,
+            val)
 
     def __parseGet(self, data):
         flags=struct.unpack(memcacheConstants.GET_RES_FMT, data[-1][:4])[0]
@@ -272,7 +273,7 @@ class ComplianceTest(unittest.TestCase):
     def testIncrDoesntExistCreate(self):
         """Testing incr when a value doesn't exist (and we make a new one)"""
         self.assertNotExists("x")
-        self.assertEquals(19, self.mc.incr("x", init=19))
+        self.assertEquals(19, self.mc.incr("x", init=19)[0])
 
     def testDecrDoesntExistNoCreate(self):
         """Testing decr when a value doesn't exist (and not creating)."""
@@ -286,26 +287,26 @@ class ComplianceTest(unittest.TestCase):
     def testDecrDoesntExistCreate(self):
         """Testing decr when a value doesn't exist (and we make a new one)"""
         self.assertNotExists("x")
-        self.assertEquals(19, self.mc.decr("x", init=19))
+        self.assertEquals(19, self.mc.decr("x", init=19)[0])
 
     def testIncr(self):
         """Simple incr test."""
-        val=self.mc.incr("x")
+        val, cas=self.mc.incr("x")
         self.assertEquals(0, val)
-        val=self.mc.incr("x")
+        val, cas=self.mc.incr("x")
         self.assertEquals(1, val)
-        val=self.mc.incr("x", 211)
+        val, cas=self.mc.incr("x", 211)
         self.assertEquals(212, val)
-        val=self.mc.incr("x", 2**33)
+        val, cas=self.mc.incr("x", 2**33)
         self.assertEquals(8589934804L, val)
 
     def testDecr(self):
         """Simple decr test."""
-        val=self.mc.incr("x", init=5)
+        val, cas=self.mc.incr("x", init=5)
         self.assertEquals(5, val)
-        val=self.mc.decr("x")
+        val, cas=self.mc.decr("x")
         self.assertEquals(4, val)
-        val=self.mc.decr("x", 211)
+        val, cas=self.mc.decr("x", 211)
         self.assertEquals(0, val)
 
     def testCas(self):
@@ -335,6 +336,41 @@ class ComplianceTest(unittest.TestCase):
             self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
         newflags, newi, newval=self.mc.get("x")
         self.assertEquals("new value", newval)
+
+    # Assert we know the correct CAS for a given key.
+    def assertValidCas(self, key, cas):
+        flags, currentcas, val=self.mc.get(key)
+        self.assertEquals(currentcas, cas)
+
+    def testSetReturnsCas(self):
+        """Ensure a set command returns the current CAS."""
+        vals=self.mc.set('x', 5, 19, 'some val')
+        self.assertValidCas('x', vals[1])
+
+    def testAddReturnsCas(self):
+        """Ensure an add command returns the current CAS."""
+        vals=self.mc.add('x', 5, 19, 'some val')
+        self.assertValidCas('x', vals[1])
+
+    def testReplaceReturnsCas(self):
+        """Ensure a replace command returns the current CAS."""
+        vals=self.mc.add('x', 5, 19, 'some val')
+        vals=self.mc.replace('x', 5, 19, 'other val')
+        self.assertValidCas('x', vals[1])
+
+    def testIncrReturnsCAS(self):
+        """Ensure an incr command returns the current CAS."""
+        val, cas, something=self.mc.set("x", 5, 19, '4')
+        val, cas=self.mc.incr("x", init=5)
+        self.assertEquals(5, val)
+        self.assertValidCas('x', cas)
+
+    def testDecrReturnsCAS(self):
+        """Ensure an decr command returns the current CAS."""
+        val, cas, something=self.mc.set("x", 5, 19, '4')
+        val, cas=self.mc.decr("x", init=5)
+        self.assertEquals(3, val)
+        self.assertValidCas('x', cas)
 
 if __name__ == '__main__':
     unittest.main()
