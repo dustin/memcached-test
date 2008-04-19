@@ -59,6 +59,9 @@ class BaseBackend(object):
         val=data[keylen+hdrSize:]
         return hdr, key, val
 
+    def _error(self, which, msg):
+        return which, msg
+
     def processCommand(self, cmd, keylen, data):
         """Entry point for command processing.  Lower level protocol
         implementations deliver values here."""
@@ -74,8 +77,8 @@ class BaseBackend(object):
 
     def handle_unknown(self, cmd, hdrs, key, data):
         """invoked for any unknown command."""
-        return memcacheConstants.ERR_UNKNOWN_CMD, \
-            "The command %d is unknown" % cmd
+        return self._error(memcacheConstants.ERR_UNKNOWN_CMD,
+            "The command %d is unknown" % cmd)
 
 class DictBackend(BaseBackend):
     """Sample backend implementation with a non-expiring dict."""
@@ -103,7 +106,7 @@ class DictBackend(BaseBackend):
             rv = 0, struct.pack(
                 memcacheConstants.GET_RES_FMT, id(val), val[0]) + val[2]
         else:
-            rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
+            rv=self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
         return rv
 
     def handle_set(self, cmd, hdrs, key, data):
@@ -113,9 +116,9 @@ class DictBackend(BaseBackend):
         if oldVal == 0 or (val and oldVal == id(val)):
             rv = self.__handle_unconditional_set(cmd, hdrs, key, data)
         elif val:
-            rv = memcacheConstants.ERR_EXISTS, 'Exists'
+            rv = self._error(memcacheConstants.ERR_EXISTS, 'Exists')
         else:
-            rv = memcacheConstants.ERR_NOT_FOUND, 'Not found'
+            rv = self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
         return rv
 
     def handle_getq(self, cmd, hdrs, key, data):
@@ -134,7 +137,7 @@ class DictBackend(BaseBackend):
 
     def __mutation(self, cmd, hdrs, key, data, multiplier):
         amount, initial, expiration=hdrs
-        rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
+        rv=self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
         val=self.storage.get(key, None)
         print "Mutating %s, hdrs=%s, val=%s %s" % (key, `hdrs`, `val`,
             multiplier)
@@ -170,13 +173,13 @@ class DictBackend(BaseBackend):
         return rv
 
     def handle_add(self, cmd, hdrs, key, data):
-        rv=memcacheConstants.ERR_EXISTS, 'Data exists for key'
+        rv=self._error(memcacheConstants.ERR_EXISTS, 'Data exists for key')
         if key not in self.storage and not self.__has_hold(key):
             rv=self.__handle_unconditional_set(cmd, hdrs, key, data)
         return rv
 
     def handle_replace(self, cmd, hdrs, key, data):
-        rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
+        rv=self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
         if key in self.storage and not self.__has_hold(key):
             rv=self.__handle_unconditional_set(cmd, hdrs, key, data)
         return rv
@@ -188,7 +191,7 @@ class DictBackend(BaseBackend):
         return 0, ''
 
     def handle_delete(self, cmd, hdrs, key, data):
-        rv=memcacheConstants.ERR_NOT_FOUND, 'Not found'
+        rv=self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
         if key in self.storage:
             del self.storage[key]
             print "Deleted", key, hdrs[0]
