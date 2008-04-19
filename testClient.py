@@ -80,6 +80,15 @@ class MemcachedClient(object):
         return self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp),
             cas)
 
+    def _cat(self, cmd, key, cas, val):
+        return self._doCmd(cmd, key, val, '', cas)
+
+    def append(self, key, value, cas=0):
+        return self._cat(memcacheConstants.CMD_APPEND, key, cas, value)
+
+    def prepend(self, key, value, cas=0):
+        return self._cat(memcacheConstants.CMD_PREPEND, key, cas, value)
+
     def __incrdecr(self, cmd, key, amt, init, exp):
         something, cas, val=self._doCmd(cmd, key, '',
             struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp))
@@ -387,6 +396,38 @@ class ComplianceTest(unittest.TestCase):
         self.assertGet((19, '4'), self.mc.get('x'))
         self.mc.delete('x', cas=cas)
         self.assertNotExists('x')
+
+    def testAppend(self):
+        """Test append functionality."""
+        val, cas, something=self.mc.set("x", 5, 19, "some")
+        val, cas, something=self.mc.append("x", "thing")
+        self.assertGet((19, 'something'), self.mc.get("x"))
+
+    def testAppendCAS(self):
+        """Test append functionality honors CAS."""
+        val, cas, something=self.mc.set("x", 5, 19, "some")
+        try:
+            val, cas, something=self.mc.append("x", "thing", cas+1)
+            self.fail("expected CAS failure.")
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
+        self.assertGet((19, 'some'), self.mc.get("x"))
+
+    def testPrepend(self):
+        """Test prepend functionality."""
+        val, cas, something=self.mc.set("x", 5, 19, "some")
+        val, cas, something=self.mc.prepend("x", "thing")
+        self.assertGet((19, 'thingsome'), self.mc.get("x"))
+
+    def testPrependCAS(self):
+        """Test prepend functionality honors CAS."""
+        val, cas, something=self.mc.set("x", 5, 19, "some")
+        try:
+            val, cas, something=self.mc.prepend("x", "thing", cas+1)
+            self.fail("expected CAS failure.")
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
+        self.assertGet((19, 'some'), self.mc.get("x"))
 
 if __name__ == '__main__':
     unittest.main()

@@ -36,6 +36,8 @@ class BaseBackend(object):
         memcacheConstants.CMD_FLUSH: 'handle_flush',
         memcacheConstants.CMD_NOOP: 'handle_noop',
         memcacheConstants.CMD_VERSION: 'handle_version',
+        memcacheConstants.CMD_APPEND: 'handle_append',
+        memcacheConstants.CMD_PREPEND: 'handle_prepend',
         }
 
     def __init__(self):
@@ -209,6 +211,28 @@ class DictBackend(BaseBackend):
 
     def handle_version(self, cmd, hdrs, key, cas, data):
         return 0, 0, "Python test memcached server %s" % VERSION
+
+    def _withCAS(self, key, cas, f):
+        val=self.storage.get(key, None)
+        if cas == 0 or (val and cas == id(val)):
+            rv=f(val)
+        elif val:
+            rv = self._error(memcacheConstants.ERR_EXISTS, 'Exists')
+        else:
+            rv = self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
+        return rv
+
+    def handle_prepend(self, cmd, hdrs, key, cas, data):
+        def f(val):
+            self.storage[key]=(val[0], val[1], data + val[2])
+            return 0, id(self.storage[key]), ''
+        return self._withCAS(key, cas, f)
+
+    def handle_append(self, cmd, hdrs, key, cas, data):
+        def f(val):
+            self.storage[key]=(val[0], val[1], val[2] + data)
+            return 0, id(self.storage[key]), ''
+        return self._withCAS(key, cas, f)
 
 class MemcachedBinaryChannel(asyncore.dispatcher):
     """A channel implementing the binary protocol for memcached."""
