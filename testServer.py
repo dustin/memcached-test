@@ -60,22 +60,23 @@ class BaseBackend(object):
         return hdr, key, val
 
     def _error(self, which, msg):
-        return which, msg
+        return which, 0, msg
 
-    def processCommand(self, cmd, keylen, data):
+    def processCommand(self, cmd, keylen, cas, data):
         """Entry point for command processing.  Lower level protocol
         implementations deliver values here."""
         hdrs, key, val=self._splitKeys(EXTRA_HDR_FMTS.get(cmd, ''),
             keylen, data)
 
-        return self.handlers.get(cmd, self.handle_unknown)(cmd, hdrs, key, val)
+        return self.handlers.get(cmd, self.handle_unknown)(cmd, hdrs, key,
+            cas, val)
 
-    def handle_noop(self, cmd, hdrs, key, data):
+    def handle_noop(self, cmd, hdrs, key, cas, data):
         """Handle a noop"""
         print "Noop"
-        return 0, ''
+        return 0, 0, ''
 
-    def handle_unknown(self, cmd, hdrs, key, data):
+    def handle_unknown(self, cmd, hdrs, key, cas, data):
         """invoked for any unknown command."""
         return self._error(memcacheConstants.ERR_UNKNOWN_CMD,
             "The command %d is unknown" % cmd)
@@ -100,19 +101,20 @@ class DictBackend(BaseBackend):
             print "Miss looking up", key
         return rv
 
-    def handle_get(self, cmd, hdrs, key, data):
+    def handle_get(self, cmd, hdrs, key, cas, data):
         val=self.__lookup(key)
         if val:
-            rv = 0, struct.pack(
-                memcacheConstants.GET_RES_FMT, id(val), val[0]) + val[2]
+            rv = 0, id(val), struct.pack(
+                memcacheConstants.GET_RES_FMT, val[0]) + val[2]
         else:
             rv=self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
         return rv
 
-    def handle_set(self, cmd, hdrs, key, data):
+    def handle_set(self, cmd, hdrs, key, cas, data):
         print "Handling a set with", hdrs
         val=self.__lookup(key)
-        oldVal, exp, flags=hdrs
+        oldVal = cas
+        exp, flags=hdrs
         if oldVal == 0 or (val and oldVal == id(val)):
             rv = self.__handle_unconditional_set(cmd, hdrs, key, data)
         elif val:
@@ -121,19 +123,19 @@ class DictBackend(BaseBackend):
             rv = self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
         return rv
 
-    def handle_getq(self, cmd, hdrs, key, data):
-        rv=self.handle_get(cmd, hdrs, key, data)
+    def handle_getq(self, cmd, hdrs, key, cas, data):
+        rv=self.handle_get(cmd, hdrs, key, cas, data)
         if rv[0] == memcacheConstants.ERR_NOT_FOUND:
             print "Swallowing miss"
             rv = None
         return rv
 
     def __handle_unconditional_set(self, cmd, hdrs, key, data):
-        self.storage[key]=(hdrs[1], time.time() + hdrs[2], data)
+        self.storage[key]=(hdrs[0], time.time() + hdrs[1], data)
         print "Stored", self.storage[key], "in", key
         if key in self.held_keys:
             del self.held_keys[key]
-        return 0, ''
+        return 0, id(self.storage[key]), ''
 
     def __mutation(self, cmd, hdrs, key, data, multiplier):
         amount, initial, expiration=hdrs
@@ -144,21 +146,21 @@ class DictBackend(BaseBackend):
         if val:
             val = (val[0], val[1], max(0, val[2] + (multiplier * amount)))
             self.storage[key]=val
-            rv=0, str(val[2])
+            rv=0, id(val), str(val[2])
         else:
             if expiration != memcacheConstants.INCRDECR_SPECIAL:
                 self.storage[key]=(0, time.time() + expiration, initial)
-                rv=0, str(initial)
+                rv=0, id(self.storage[key]), str(initial)
         if rv[0] == 0:
-            rv = rv[0], struct.pack(
-                memcacheConstants.INCRDECR_RES_FMT, long(rv[1]))
+            rv = rv[0], rv[1], struct.pack(
+                memcacheConstants.INCRDECR_RES_FMT, long(rv[2]))
         print "Returning", rv
         return rv
 
-    def handle_incr(self, cmd, hdrs, key, data):
+    def handle_incr(self, cmd, hdrs, key, cas, data):
         return self.__mutation(cmd, hdrs, key, data, 1)
 
-    def handle_decr(self, cmd, hdrs, key, data):
+    def handle_decr(self, cmd, hdrs, key, cas, data):
         return self.__mutation(cmd, hdrs, key, data, -1)
 
     def __has_hold(self, key):
@@ -172,36 +174,36 @@ class DictBackend(BaseBackend):
                 rv=True
         return rv
 
-    def handle_add(self, cmd, hdrs, key, data):
+    def handle_add(self, cmd, hdrs, key, cas, data):
         rv=self._error(memcacheConstants.ERR_EXISTS, 'Data exists for key')
         if key not in self.storage and not self.__has_hold(key):
             rv=self.__handle_unconditional_set(cmd, hdrs, key, data)
         return rv
 
-    def handle_replace(self, cmd, hdrs, key, data):
+    def handle_replace(self, cmd, hdrs, key, cas, data):
         rv=self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
         if key in self.storage and not self.__has_hold(key):
             rv=self.__handle_unconditional_set(cmd, hdrs, key, data)
         return rv
 
-    def handle_flush(self, cmd, hdrs, key, data):
+    def handle_flush(self, cmd, hdrs, key, cas, data):
         self.storage.clear()
         self.held_keys.clear()
         print "Flushed"
-        return 0, ''
+        return 0, 0, ''
 
-    def handle_delete(self, cmd, hdrs, key, data):
+    def handle_delete(self, cmd, hdrs, key, cas, data):
         rv=self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
         if key in self.storage:
             del self.storage[key]
             print "Deleted", key, hdrs[0]
             if hdrs[0] > 0:
                 self.held_keys[key] = time.time() + hdrs[0]
-            rv=0, ''
+            rv=0, 0, ''
         return rv
 
-    def handle_version(self, cmd, hdrs, key, data):
-        return 0, "Python test memcached server %s" % VERSION
+    def handle_version(self, cmd, hdrs, key, cas, data):
+        return 0, 0, "Python test memcached server %s" % VERSION
 
 class MemcachedBinaryChannel(asyncore.dispatcher):
     """A channel implementing the binary protocol for memcached."""
@@ -219,7 +221,7 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
     def __hasEnoughBytes(self):
         rv=False
         if len(self.rbuf) >= MIN_RECV_PACKET:
-            magic, cmd, keylen, extralen, datatype, remaining, opaque=\
+            magic, cmd, keylen, extralen, datatype, remaining, opaque, cas=\
                 struct.unpack(REQ_PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
             rv = len(self.rbuf) - MIN_RECV_PACKET >= remaining
         return rv
@@ -227,7 +229,7 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
     def handle_read(self):
         self.rbuf += self.recv(self.BUFFER_SIZE)
         while self.__hasEnoughBytes():
-            magic, cmd, keylen, extralen, datatype, remaining, opaque=\
+            magic, cmd, keylen, extralen, datatype, remaining, opaque, cas=\
                 struct.unpack(REQ_PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
             assert magic == REQ_MAGIC_BYTE
             assert keylen <= remaining, "Keylen is too big: %d > %d" \
@@ -239,14 +241,20 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
             # Remove this request from the read buffer
             self.rbuf=self.rbuf[MIN_RECV_PACKET+remaining:]
             # Process the command
-            cmdVal=self.backend.processCommand(cmd, keylen, data)
+            cmdVal=self.backend.processCommand(cmd, keylen, cas, data)
             # Queue the response to the client if applicable.
             if cmdVal:
-                status, response = cmdVal
+                try:
+                    status, cas, response = cmdVal
+                except ValueError:
+                    print "Got", cmdVal
+                    raise
                 dtype=0
                 extralen=memcacheConstants.EXTRA_HDR_SIZES.get(cmd, 0)
-                self.wbuf += struct.pack(RES_PKT_FMT, RES_MAGIC_BYTE, cmd,
-                    status, extralen, dtype, len(response), opaque) + response
+                self.wbuf += struct.pack(RES_PKT_FMT,
+                    RES_MAGIC_BYTE, cmd, keylen,
+                    extralen, dtype, status,
+                    len(response), opaque, cas) + response
 
     def writable(self):
         return self.wbuf

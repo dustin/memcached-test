@@ -47,17 +47,17 @@ class MemcachedClient(object):
     def __del__(self):
         self.close()
 
-    def _sendCmd(self, cmd, key, val, opaque, extraHeader=''):
+    def _sendCmd(self, cmd, key, val, opaque, extraHeader='', cas=0):
         dtype=0
         msg=struct.pack(REQ_PKT_FMT, REQ_MAGIC_BYTE,
             cmd, len(key), len(extraHeader), dtype,
-                len(key) + len(extraHeader) + len(val), opaque)
+                len(key) + len(extraHeader) + len(val), opaque, cas)
         self.s.send(msg + extraHeader + key + val)
 
     def _handleSingleResponse(self, myopaque):
         response=self.s.recv(MIN_RECV_PACKET)
         assert len(response) == MIN_RECV_PACKET
-        magic, cmd, errcode, extralen, dtype, remaining, opaque=\
+        magic, cmd, keylen, extralen, dtype, errcode, remaining, opaque, cas=\
             struct.unpack(RES_PKT_FMT, response)
         if remaining > 0:
             rv=self.s.recv(remaining)
@@ -68,20 +68,22 @@ class MemcachedClient(object):
             "expected opaque %x, got %x" % (myopaque, opaque)
         if errcode != 0:
             raise MemcachedError(errcode,  rv)
-        return opaque, rv
+        return opaque, cas, rv
 
-    def _doCmd(self, cmd, key, val, extraHeader=''):
+    def _doCmd(self, cmd, key, val, extraHeader='', cas=0):
         """Send a command and await its response."""
         opaque=self.r.randint(0, 2**32)
-        self._sendCmd(cmd, key, val, opaque, extraHeader)
-        return self._handleSingleResponse(opaque)[1]
+        self._sendCmd(cmd, key, val, opaque, extraHeader, cas)
+        return self._handleSingleResponse(opaque)
 
     def _mutate(self, cmd, key, exp, flags, cas, val):
-        self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, cas, flags, exp))
+        self._doCmd(cmd, key, val, struct.pack(SET_PKT_FMT, flags, exp), cas)
 
     def __incrdecr(self, cmd, key, amt, init, exp):
-        return struct.unpack(INCRDECR_RES_FMT, self._doCmd(cmd, key, '',
-            struct.pack(memcacheConstants.INCRDECR_PKT_FMT, amt, init, exp)))[0]
+        return struct.unpack(INCRDECR_RES_FMT,
+            self._doCmd(cmd, key, '',
+                struct.pack(memcacheConstants.INCRDECR_PKT_FMT,
+                    amt, init, exp))[-1])[0]
 
     def incr(self, key, amt=1, init=0, exp=0):
         """Increment or create the named counter."""
@@ -104,8 +106,8 @@ class MemcachedClient(object):
         self._mutate(memcacheConstants.CMD_REPLACE, key, exp, flags, 0, val)
 
     def __parseGet(self, data):
-        parts=struct.unpack(memcacheConstants.GET_RES_FMT, data[:12])
-        return parts[1], parts[0], data[12:]
+        flags=struct.unpack(memcacheConstants.GET_RES_FMT, data[-1][:4])[0]
+        return flags, data[1], data[-1][4:]
 
     def get(self, key):
         """Get the value for a given key within the memcached server."""
@@ -137,9 +139,9 @@ class MemcachedClient(object):
         rv={}
         done=False
         while not done:
-            opaque, data=self._handleSingleResponse(None)
+            opaque, cas, data=self._handleSingleResponse(None)
             if opaque != terminal:
-                rv[opaqued[opaque]]=self.__parseGet(data)
+                rv[opaqued[opaque]]=self.__parseGet((opaque, cas, data))
             else:
                 done=True
 
