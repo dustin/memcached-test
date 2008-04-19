@@ -152,10 +152,10 @@ class MemcachedClient(object):
         """Send a noop command."""
         self._doCmd(memcacheConstants.CMD_NOOP, '', '')
 
-    def delete(self, key, when=0):
+    def delete(self, key, when=0, cas=0):
         """Delete the value for a given key within the memcached server."""
         self._doCmd(memcacheConstants.CMD_DELETE, key, '',
-            struct.pack(DEL_PKT_FMT, when))
+            struct.pack(DEL_PKT_FMT, when), cas)
 
     def flush(self):
         """Flush all storage in a memcached instance."""
@@ -371,6 +371,22 @@ class ComplianceTest(unittest.TestCase):
         val, cas=self.mc.decr("x", init=5)
         self.assertEquals(3, val)
         self.assertValidCas('x', cas)
+
+    def testDeletionCAS(self):
+        """Validation deletion honors cas."""
+        try:
+            self.mc.delete("x")
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_NOT_FOUND, e.status)
+        val, cas, something=self.mc.set("x", 5, 19, '4')
+        try:
+            self.mc.delete('x', cas=cas+1)
+            self.fail("Deletion should've failed.")
+        except MemcachedError, e:
+            self.assertEquals(memcacheConstants.ERR_EXISTS, e.status)
+        self.assertGet((19, '4'), self.mc.get('x'))
+        self.mc.delete('x', cas=cas)
+        self.assertNotExists('x')
 
 if __name__ == '__main__':
     unittest.main()
