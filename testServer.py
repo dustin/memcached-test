@@ -205,12 +205,14 @@ class DictBackend(BaseBackend):
 
     def handle_delete(self, cmd, hdrs, key, cas, data):
         def f(val):
+            rv=self._error(memcacheConstants.ERR_NOT_FOUND, 'Not found')
             if val:
                 del self.storage[key]
+                rv = 0, 0, ''
             print "Deleted", key, hdrs[0]
             if hdrs[0] > 0:
                 self.held_keys[key] = time.time() + hdrs[0]
-            return 0, 0, ''
+            return rv
         return self._withCAS(key, cas, f)
 
     def handle_version(self, cmd, hdrs, key, cas, data):
