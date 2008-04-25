@@ -191,6 +191,12 @@ class ComplianceTest(unittest.TestCase):
         self.mc.set("x", 5, 19, "somevalue")
         self.assertGet((19, "somevalue"), self.mc.get("x"))
 
+    def testZeroExpiration(self):
+        """Ensure zero-expiration sets work properly."""
+        self.mc.set("x", 0, 19, "somevalue")
+        time.sleep(1.1)
+        self.assertGet((19, "somevalue"), self.mc.get("x"))
+
     def assertNotExists(self, key):
         try:
             x=self.mc.get(key)

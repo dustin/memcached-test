@@ -136,7 +136,11 @@ class DictBackend(BaseBackend):
         return rv
 
     def __handle_unconditional_set(self, cmd, hdrs, key, data):
-        self.storage[key]=(hdrs[0], time.time() + hdrs[1], data)
+        exp=hdrs[1]
+        # If it's going to expire soon, tell it to wait a while.
+        if exp == 0:
+            exp=float(2 ** 31)
+        self.storage[key]=(hdrs[0], time.time() + exp, data)
         print "Stored", self.storage[key], "in", key
         if key in self.held_keys:
             del self.held_keys[key]
