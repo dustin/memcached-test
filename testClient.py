@@ -439,9 +439,9 @@ class ComplianceTest(unittest.TestCase):
     def testTimeBombedFlush(self):
         """Test a flush with a time bomb."""
         val, cas, something=self.mc.set("x", 5, 19, "some")
-        self.mc.flush(1)
+        self.mc.flush(2)
         self.assertGet((19, 'some'), self.mc.get("x"))
-        time.sleep(1.1)
+        time.sleep(2.1)
         self.assertNotExists('x')
 
 if __name__ == '__main__':
