@@ -29,7 +29,7 @@ SET_PKT_FMT=">II"
 GET_RES_FMT=">I"
 
 # How long until the deletion takes effect.
-DEL_PKT_FMT=">I"
+DEL_PKT_FMT=""
 
 # amount, initial value, expiration
 INCRDECR_PKT_FMT=">QQI"
