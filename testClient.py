@@ -54,7 +54,7 @@ class MemcachedClient(object):
                 len(key) + len(extraHeader) + len(val), opaque, cas)
         self.s.send(msg + extraHeader + key + val)
 
-    def _handleSingleResponse(self, myopaque):
+    def _handleKeyedResponse(self, myopaque):
         response=self.s.recv(MIN_RECV_PACKET)
         assert len(response) == MIN_RECV_PACKET
         magic, cmd, keylen, extralen, dtype, errcode, remaining, opaque, cas=\
@@ -68,7 +68,11 @@ class MemcachedClient(object):
             "expected opaque %x, got %x" % (myopaque, opaque)
         if errcode != 0:
             raise MemcachedError(errcode,  rv)
-        return opaque, cas, rv
+        return opaque, cas, keylen, rv
+
+    def _handleSingleResponse(self, myopaque):
+        opaque, cas, keylen, data = self._handleKeyedResponse(myopaque)
+        return opaque, cas, data
 
     def _doCmd(self, cmd, key, val, extraHeader='', cas=0):
         """Send a command and await its response."""
