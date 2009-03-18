@@ -161,6 +161,20 @@ class MemcachedClient(object):
 
         return rv
 
+    def stats(self, sub=''):
+        """Get stats."""
+        opaque=self.r.randint(0, 2**32)
+        self._sendCmd(memcacheConstants.CMD_STAT, sub, '', opaque)
+        done = False
+        rv = {}
+        while not done:
+            opaque, cas, klen, data = self._handleKeyedResponse(None)
+            if klen:
+                rv[data[0:klen]] = data[klen:]
+            else:
+                done = True
+        return rv
+
     def noop(self):
         """Send a noop command."""
         return self._doCmd(memcacheConstants.CMD_NOOP, '', '')
