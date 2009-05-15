@@ -137,6 +137,16 @@ class MemcachedClient(object):
         """Get the value for a given key within the memcached server."""
         return self._doCmd(memcacheConstants.CMD_VERSION, '', '')
 
+    def sasl_mechanisms(self):
+        """Get the supported SASL methods."""
+        return set(self._doCmd(memcacheConstants.CMD_SASL_LIST_MECHS,
+                               '', '')[2].split(' '))
+
+    def sasl_auth(self, mech, user, password, foruser=''):
+        """Start a sasl auth session."""
+        return self._doCmd(memcacheConstants.CMD_SASL_AUTH,
+                           mech, '\0'.join([foruser, user, password]))
+
     def getMulti(self, keys):
         """Get values for any available keys in the given iterable.
 

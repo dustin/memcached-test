@@ -39,6 +39,8 @@ class BaseBackend(object):
         memcacheConstants.CMD_VERSION: 'handle_version',
         memcacheConstants.CMD_APPEND: 'handle_append',
         memcacheConstants.CMD_PREPEND: 'handle_prepend',
+        memcacheConstants.CMD_SASL_LIST_MECHS: 'handle_sasl_mechs',
+        memcacheConstants.CMD_SASL_AUTH: 'handle_sasl_auth',
         }
 
     def __init__(self):
@@ -243,6 +245,18 @@ class DictBackend(BaseBackend):
             self.storage[key]=(val[0], val[1], val[2] + data)
             return 0, id(self.storage[key]), ''
         return self._withCAS(key, cas, f)
+
+    def handle_sasl_mechs(self, cmd, hdrs, key, cas, data):
+        return 0, 0, 'PLAIN'
+
+    def handle_sasl_auth(self, cmd, hdrs, key, cas, data):
+        mech = key
+        foruser, user, passwd = data.split("\0")
+
+        if mech == 'PLAIN' and user == 'testuser' and passwd == 'testpass':
+            return 0, 0, "OK"
+        else:
+            return self._error(memcacheConstants.ERR_AUTH, 'Auth error.')
 
 class MemcachedBinaryChannel(asyncore.dispatcher):
     """A channel implementing the binary protocol for memcached."""
