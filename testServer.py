@@ -341,5 +341,9 @@ class MemcachedServer(asyncore.dispatcher):
         self.handler(channel, self.backend)
 
 if __name__ == '__main__':
-    server = MemcachedServer(DictBackend(), MemcachedBinaryChannel, port=11211)
+    port = 11211
+    import sys
+    if sys.argv > 1:
+        port = int(sys.argv[1])
+    server = MemcachedServer(DictBackend(), MemcachedBinaryChannel, port=port)
     asyncore.loop()
