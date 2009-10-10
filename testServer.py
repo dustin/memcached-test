@@ -9,6 +9,7 @@ import asyncore
 import socket
 import struct
 import time
+import hmac
 import heapq
 
 import memcacheConstants
@@ -18,6 +19,8 @@ from memcacheConstants import INCRDECR_RES_FMT
 from memcacheConstants import REQ_MAGIC_BYTE, RES_MAGIC_BYTE, EXTRA_HDR_FMTS
 
 VERSION="1.0"
+
+CHALLENGE = 'notreallyrandomchallengedata'
 
 class BaseBackend(object):
     """Higher-level backend (processes commands and stuff)."""
@@ -41,6 +44,7 @@ class BaseBackend(object):
         memcacheConstants.CMD_PREPEND: 'handle_prepend',
         memcacheConstants.CMD_SASL_LIST_MECHS: 'handle_sasl_mechs',
         memcacheConstants.CMD_SASL_AUTH: 'handle_sasl_auth',
+        memcacheConstants.CMD_SASL_STEP: 'handle_sasl_step',
         }
 
     def __init__(self):
@@ -247,15 +251,40 @@ class DictBackend(BaseBackend):
         return self._withCAS(key, cas, f)
 
     def handle_sasl_mechs(self, cmd, hdrs, key, cas, data):
-        return 0, 0, 'PLAIN'
+        return 0, 0, 'PLAIN CRAM-MD5'
+
+    def handle_sasl_step(self, cmd, hdrs, key, cas, data):
+        assert key == 'CRAM-MD5'
+
+        u, resp = data.split(' ', 1)
+        expected = hmac.HMAC('testpass', CHALLENGE).hexdigest()
+
+        if u == 'testuser' and resp == expected:
+            return 0, 0, 'OK'
+        else:
+            return self._error(memcacheConstants.ERR_AUTH, 'Auth error.')
+
+    def _handle_sasl_auth_plain(self, data):
+        foruser, user, passwd = data.split("\0")
+        if user == 'testuser' and passwd == 'testpass':
+            return 0, 0, "OK"
+        else:
+            print "Bad username/password:  %s/%s" % (user, passwd)
+            return self._error(memcacheConstants.ERR_AUTH, 'Auth error.')
+
+    def _handle_sasl_auth_cram_md5(self, data):
+        assert data == ''
+        return memcacheConstants.ERR_AUTH_CONTINUE, 0, CHALLENGE
 
     def handle_sasl_auth(self, cmd, hdrs, key, cas, data):
         mech = key
-        foruser, user, passwd = data.split("\0")
 
-        if mech == 'PLAIN' and user == 'testuser' and passwd == 'testpass':
-            return 0, 0, "OK"
+        if mech == 'PLAIN':
+            return self._handle_sasl_auth_plain(data)
+        elif mech == 'CRAM-MD5':
+            return self._handle_sasl_auth_cram_md5(data)
         else:
+            print "Unhandled auth type:  %s" % mech
             return self._error(memcacheConstants.ERR_AUTH, 'Auth error.')
 
 class MemcachedBinaryChannel(asyncore.dispatcher):

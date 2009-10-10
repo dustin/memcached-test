@@ -7,6 +7,7 @@ Copyright (c) 2007  Dustin Sallings <dustin@spy.net>
 
 import sys
 import time
+import hmac
 import socket
 import random
 import struct
@@ -142,10 +143,26 @@ class MemcachedClient(object):
         return set(self._doCmd(memcacheConstants.CMD_SASL_LIST_MECHS,
                                '', '')[2].split(' '))
 
-    def sasl_auth(self, mech, user, password, foruser=''):
+    def sasl_auth_start(self, mech, data):
         """Start a sasl auth session."""
-        return self._doCmd(memcacheConstants.CMD_SASL_AUTH,
-                           mech, '\0'.join([foruser, user, password]))
+        return self._doCmd(memcacheConstants.CMD_SASL_AUTH, mech, data)
+
+    def sasl_auth_plain(self, user, password, foruser=''):
+        """Perform plain auth."""
+        return self.sasl_auth_start('PLAIN', '\0'.join([foruser, user, password]))
+
+    def sasl_auth_cram_md5(self, user, password):
+        """Start a plan auth session."""
+        try:
+            self.sasl_auth_start('CRAM-MD5', '')
+        except MemcachedError, e:
+            if e.status != memcacheConstants.ERR_AUTH_CONTINUE:
+                raise
+            challenge = e.msg
+
+        dig = hmac.HMAC(password, challenge).hexdigest()
+        return self._doCmd(memcacheConstants.CMD_SASL_STEP, 'CRAM-MD5',
+                           user + ' ' + dig)
 
     def getMulti(self, keys):
         """Get values for any available keys in the given iterable.
