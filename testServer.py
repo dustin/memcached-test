@@ -6,6 +6,8 @@ Copyright (c) 2007  Dustin Sallings <dustin@spy.net>
 """
 
 import asyncore
+import random
+import string
 import socket
 import struct
 import time
@@ -19,8 +21,6 @@ from memcacheConstants import INCRDECR_RES_FMT
 from memcacheConstants import REQ_MAGIC_BYTE, RES_MAGIC_BYTE, EXTRA_HDR_FMTS
 
 VERSION="1.0"
-
-CHALLENGE = 'notreallyrandomchallengedata'
 
 class BaseBackend(object):
     """Higher-level backend (processes commands and stuff)."""
@@ -104,6 +104,8 @@ class DictBackend(BaseBackend):
         super(DictBackend, self).__init__()
         self.storage={}
         self.held_keys={}
+        self.challenge = ''.join(random.sample(string.ascii_letters
+                                               + string.digits, 32))
 
     def __lookup(self, key):
         rv=self.storage.get(key, None)
@@ -257,7 +259,7 @@ class DictBackend(BaseBackend):
         assert key == 'CRAM-MD5'
 
         u, resp = data.split(' ', 1)
-        expected = hmac.HMAC('testpass', CHALLENGE).hexdigest()
+        expected = hmac.HMAC('testpass', self.challenge).hexdigest()
 
         if u == 'testuser' and resp == expected:
             return 0, 0, 'OK'
@@ -274,7 +276,7 @@ class DictBackend(BaseBackend):
 
     def _handle_sasl_auth_cram_md5(self, data):
         assert data == ''
-        return memcacheConstants.ERR_AUTH_CONTINUE, 0, CHALLENGE
+        return memcacheConstants.ERR_AUTH_CONTINUE, 0, self.challenge
 
     def handle_sasl_auth(self, cmd, hdrs, key, cas, data):
         mech = key
