@@ -262,13 +262,16 @@ class DictBackend(BaseBackend):
         expected = hmac.HMAC('testpass', self.challenge).hexdigest()
 
         if u == 'testuser' and resp == expected:
+            print "Successful CRAM-MD5 auth."
             return 0, 0, 'OK'
         else:
+            print "Errored a CRAM-MD5 auth."
             return self._error(memcacheConstants.ERR_AUTH, 'Auth error.')
 
     def _handle_sasl_auth_plain(self, data):
         foruser, user, passwd = data.split("\0")
         if user == 'testuser' and passwd == 'testpass':
+            print "Successful plain auth"
             return 0, 0, "OK"
         else:
             print "Bad username/password:  %s/%s" % (user, passwd)
@@ -276,6 +279,7 @@ class DictBackend(BaseBackend):
 
     def _handle_sasl_auth_cram_md5(self, data):
         assert data == ''
+        print "Issuing %s as a CRAM-MD5 challenge." % self.challenge
         return memcacheConstants.ERR_AUTH_CONTINUE, 0, self.challenge
 
     def handle_sasl_auth(self, cmd, hdrs, key, cas, data):
