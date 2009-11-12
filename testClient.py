@@ -56,7 +56,9 @@ class MemcachedClient(object):
         self.s.send(msg + extraHeader + key + val)
 
     def _handleKeyedResponse(self, myopaque):
-        response=self.s.recv(MIN_RECV_PACKET)
+        response = ""
+        while len(response) < MIN_RECV_PACKET:
+            response += self.s.recv(MIN_RECV_PACKET - len(response))
         assert len(response) == MIN_RECV_PACKET
         magic, cmd, keylen, extralen, dtype, errcode, remaining, opaque, cas=\
             struct.unpack(RES_PKT_FMT, response)
