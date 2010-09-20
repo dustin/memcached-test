@@ -35,17 +35,9 @@ class MemcachedError(exceptions.Exception):
 class MemcachedClient(object):
     """Simple memcached client."""
 
-    def __init__(self, host='127.0.0.1', port=None):
-        if port is None:
-            tokens = host.split(':')
-            if len(tokens) == 2:
-                host = tokens[0]
-                port = int(tokens[1])
-            elif len(tokens) == 1:
-                port == 11211
-            else:
-                raise ValueError, "Too many colons in host arg"
+    vbucketId = 0
 
+    def __init__(self, host='127.0.0.1', port=11211):
         self.s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.connect_ex((host, port))
         self.r=random.Random()
@@ -59,32 +51,38 @@ class MemcachedClient(object):
     def _sendCmd(self, cmd, key, val, opaque, extraHeader='', cas=0):
         dtype=0
         msg=struct.pack(REQ_PKT_FMT, REQ_MAGIC_BYTE,
-            cmd, len(key), len(extraHeader), dtype,
+            cmd, len(key), len(extraHeader), dtype, self.vbucketId,
                 len(key) + len(extraHeader) + len(val), opaque, cas)
         self.s.send(msg + extraHeader + key + val)
 
     def _handleKeyedResponse(self, myopaque):
         response = ""
         while len(response) < MIN_RECV_PACKET:
-            response += self.s.recv(MIN_RECV_PACKET - len(response))
+            data = self.s.recv(MIN_RECV_PACKET - len(response))
+            if data == '':
+                raise exceptions.EOFError("Got empty data (remote died?).")
+            response += data
         assert len(response) == MIN_RECV_PACKET
         magic, cmd, keylen, extralen, dtype, errcode, remaining, opaque, cas=\
             struct.unpack(RES_PKT_FMT, response)
+
         rv = ""
         while remaining > 0:
             data = self.s.recv(remaining)
+            if data == '':
+                raise exceptions.EOFError("Got empty data (remote died?).")
             rv += data
             remaining -= len(data)
 
-        assert magic == RES_MAGIC_BYTE, "Got magic:  %d" % magic
+        assert (magic in (RES_MAGIC_BYTE, REQ_MAGIC_BYTE)), "Got magic: %d" % magic
         assert myopaque is None or opaque == myopaque, \
             "expected opaque %x, got %x" % (myopaque, opaque)
         if errcode != 0:
             raise MemcachedError(errcode,  rv)
-        return opaque, cas, keylen, rv
+        return cmd, opaque, cas, keylen, extralen, rv
 
     def _handleSingleResponse(self, myopaque):
-        opaque, cas, keylen, data = self._handleKeyedResponse(myopaque)
+        cmd, opaque, cas, keylen, extralen, data = self._handleKeyedResponse(myopaque)
         return opaque, cas, data
 
     def _doCmd(self, cmd, key, val, extraHeader='', cas=0):
@@ -176,29 +174,12 @@ class MemcachedClient(object):
         return self._doCmd(memcacheConstants.CMD_SASL_STEP, 'CRAM-MD5',
                            user + ' ' + dig)
 
-    def bucket_list(self):
-        """List buckets."""
-        s_str = self._doCmd(memcacheConstants.CMD_LIST_BUCKETS, '', '')[2]
-        if s_str:
-            s = set(s_str.split(' '))
-        else:
-            s = set()
-        return s
+    def set_vbucket_state(self, vbucket, state):
+        return self._doCmd(memcacheConstants.CMD_SET_VBUCKET_STATE,
+                           str(vbucket), state)
 
-    def bucket_create(self, name, config=""):
-        """Create a bucket."""
-        return self._doCmd(memcacheConstants.CMD_CREATE_BUCKET, name, config)
-
-    def bucket_delete(self, name):
-        """Delete a bucket."""
-        return self._doCmd(memcacheConstants.CMD_DELETE_BUCKET, name, '')
-
-    def bucket_expand(self, name, new_size):
-        """Create a bucket."""
-        return self._doCmd(memcacheConstants.CMD_EXPAND_BUCKET, name, str(new_size))
-
-    def bucket_select(self, name):
-        return self._doCmd(memcacheConstants.CMD_SELECT_BUCKET, name, '')
+    def delete_vbucket(self, vbucket):
+        return self._doCmd(memcacheConstants.CMD_DELETE_VBUCKET, str(vbucket), '')
 
     def getMulti(self, keys):
         """Get values for any available keys in the given iterable.
@@ -231,7 +212,7 @@ class MemcachedClient(object):
         done = False
         rv = {}
         while not done:
-            opaque, cas, klen, data = self._handleKeyedResponse(None)
+            cmd, opaque, cas, klen, extralen, data = self._handleKeyedResponse(None)
             if klen:
                 rv[data[0:klen]] = data[klen:]
             else:

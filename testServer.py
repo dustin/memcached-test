@@ -72,7 +72,7 @@ class BaseBackend(object):
     def _error(self, which, msg):
         return which, 0, msg
 
-    def processCommand(self, cmd, keylen, cas, data):
+    def processCommand(self, cmd, keylen, vb, cas, data):
         """Entry point for command processing.  Lower level protocol
         implementations deliver values here."""
 
@@ -299,37 +299,41 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
     # Receive buffer size
     BUFFER_SIZE = 4096
 
-    def __init__(self, channel, backend):
+    def __init__(self, channel, backend, wbuf=""):
         asyncore.dispatcher.__init__(self, channel)
         self.log_info("New bin connection from %s" % str(self.addr))
         self.backend=backend
-        self.wbuf=""
+        self.wbuf=wbuf
         self.rbuf=""
 
     def __hasEnoughBytes(self):
         rv=False
         if len(self.rbuf) >= MIN_RECV_PACKET:
-            magic, cmd, keylen, extralen, datatype, remaining, opaque, cas=\
+            magic, cmd, keylen, extralen, datatype, vb, remaining, opaque, cas=\
                 struct.unpack(REQ_PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
             rv = len(self.rbuf) - MIN_RECV_PACKET >= remaining
         return rv
 
+    def processCommand(self, cmd, keylen, vb, cas, data):
+        return self.backend.processCommand(cmd, keylen, vb, cas, data)
+
     def handle_read(self):
         self.rbuf += self.recv(self.BUFFER_SIZE)
         while self.__hasEnoughBytes():
-            magic, cmd, keylen, extralen, datatype, remaining, opaque, cas=\
+            magic, cmd, keylen, extralen, datatype, vb, remaining, opaque, cas=\
                 struct.unpack(REQ_PKT_FMT, self.rbuf[:MIN_RECV_PACKET])
             assert magic == REQ_MAGIC_BYTE
             assert keylen <= remaining, "Keylen is too big: %d > %d" \
                 % (keylen, remaining)
-            assert extralen == memcacheConstants.EXTRA_HDR_SIZES.get(cmd, 0)
+            assert extralen == memcacheConstants.EXTRA_HDR_SIZES.get(cmd, 0), \
+                "Extralen is too large for cmd 0x%x: %d" % (cmd, extralen)
             # Grab the data section of this request
             data=self.rbuf[MIN_RECV_PACKET:MIN_RECV_PACKET+remaining]
             assert len(data) == remaining
             # Remove this request from the read buffer
             self.rbuf=self.rbuf[MIN_RECV_PACKET+remaining:]
             # Process the command
-            cmdVal=self.backend.processCommand(cmd, keylen, cas, data)
+            cmdVal = self.processCommand(cmd, keylen, vb, extralen, cas, data)
             # Queue the response to the client if applicable.
             if cmdVal:
                 try:

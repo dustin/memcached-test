@@ -28,6 +28,29 @@ CMD_SASL_LIST_MECHS = 0x20
 CMD_SASL_AUTH = 0x21
 CMD_SASL_STEP = 0x22
 
+# Replication
+CMD_TAP_CONNECT = 0x40
+CMD_TAP_MUTATION = 0x41
+CMD_TAP_DELETE = 0x42
+CMD_TAP_FLUSH = 0x43
+CMD_TAP_OPAQUE = 0x44
+CMD_TAP_VBUCKET_SET = 0x45
+
+# vbucket stuff
+CMD_SET_VBUCKET_STATE = 0x83
+CMD_GET_VBUCKET_STATE = 0x84
+CMD_DELETE_VBUCKET = 0x85
+
+COMMAND_NAMES = dict(((globals()[k], k) for k in globals() if k.startswith("CMD_")))
+
+# TAP flags
+TAP_FLAG_BACKFILL          = 0x01
+TAP_FLAG_DUMP              = 0x02
+TAP_FLAG_LIST_VBUCKETS     = 0x04
+TAP_FLAG_TAKEOVER_VBUCKETS = 0x08
+
+TAP_FLAG_TYPES = {TAP_FLAG_BACKFILL: ">Q"}
+
 # Flags, expiration
 SET_PKT_FMT=">II"
 
@@ -36,6 +59,11 @@ GET_RES_FMT=">I"
 
 # How long until the deletion takes effect.
 DEL_PKT_FMT=""
+
+## TAP stuff
+# eng-specific length, flags, ttl, [res, res, res]; item flags, exp
+TAP_MUTATION_PKT_FMT = "HHbxxxII"
+TAP_GENERAL_PKT_FMT = "HHbxxx"
 
 # amount, initial value, expiration
 INCRDECR_PKT_FMT=">QQI"
@@ -50,8 +78,8 @@ MAGIC_BYTE = 0x80
 REQ_MAGIC_BYTE = 0x80
 RES_MAGIC_BYTE = 0x81
 
-# magic, opcode, keylen, extralen, datatype, [reserved], bodylen, opaque, cas
-REQ_PKT_FMT=">BBHBBxxIIQ"
+# magic, opcode, keylen, extralen, datatype, vbucket, bodylen, opaque, cas
+REQ_PKT_FMT=">BBHBBHIIQ"
 # magic, opcode, keylen, extralen, datatype, status, bodylen, opaque, cas
 RES_PKT_FMT=">BBHBBHIIQ"
 # min recv packet size
@@ -67,6 +95,11 @@ EXTRA_HDR_FMTS={
     CMD_DECR: INCRDECR_PKT_FMT,
     CMD_DELETE: DEL_PKT_FMT,
     CMD_FLUSH: FLUSH_PKT_FMT,
+    CMD_TAP_MUTATION: TAP_MUTATION_PKT_FMT,
+    CMD_TAP_DELETE: TAP_GENERAL_PKT_FMT,
+    CMD_TAP_FLUSH: TAP_GENERAL_PKT_FMT,
+    CMD_TAP_OPAQUE: TAP_GENERAL_PKT_FMT,
+    CMD_TAP_VBUCKET_SET: TAP_GENERAL_PKT_FMT
 }
 
 EXTRA_HDR_SIZES=dict(
