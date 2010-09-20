@@ -221,9 +221,7 @@ class DictBackend(BaseBackend):
             if val:
                 del self.storage[key]
                 rv = 0, 0, ''
-            print "Deleted", key, hdrs[0]
-            if hdrs[0] > 0:
-                self.held_keys[key] = time.time() + hdrs[0]
+            print "Deleted", key
             return rv
         return self._withCAS(key, cas, f)
 
@@ -314,7 +312,7 @@ class MemcachedBinaryChannel(asyncore.dispatcher):
             rv = len(self.rbuf) - MIN_RECV_PACKET >= remaining
         return rv
 
-    def processCommand(self, cmd, keylen, vb, cas, data):
+    def processCommand(self, cmd, keylen, vb, extralen, cas, data):
         return self.backend.processCommand(cmd, keylen, vb, cas, data)
 
     def handle_read(self):
